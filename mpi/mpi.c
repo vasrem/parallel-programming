@@ -20,8 +20,8 @@ float ko; // z axis size
 int P;	// number of processes [0:7]
 int L;	// Used for table allocation and make_grid()
 
-double **C,**Co,**Ci; // C , Coutput , Cinput
-double **Q,**Qo,**Qi; // Q , Qoutput , Qinput
+double *C,*Co,*Ci; // C , Coutput , Cinput
+double *Q,*Qo,*Qi; // Q , Qoutput , Qinput
 
 
 /* ic is the real size of C ( Not zero )
@@ -44,8 +44,8 @@ float kbh=0;	// High Z bound
 void make_grid(int);
 void check_inc_C();
 void check_inc_Q();
-void print_table(double **,int,int);
-void quicksort(double **,int,int);
+void print_table(double *,int,int,int);
+void quicksort(double *,int,int,int);
 
 
 int main(int argc, char **argv){
@@ -208,18 +208,18 @@ void check_inc_C(){
 	printf("nl=%f ml=%f kl=%f nh=%f mh=%f kh=%f\n",nbl,mbl,kbl,nbh,mbh,kbh);
 	for(s=0;s<L;s++){
 		// if end of real C break
-		if(Ci[s][0]==0 && Ci[s][1]==0 && Ci[s][2]==0){
+		if(Ci[0*L+s]==0 && Ci[1*L+s]==0 && Ci[2*L+s]==0){
 			break;
 		}
 		// if its ok for that process
-		if(Ci[s][0] < nbh && Ci[s][1] < mbh && Ci[s][2] < kbh && Ci[s][0] >= nbl && Ci[s][1] >= mbl && Ci[s][2] >= kbl){
-			C[ic][0]=0;
-			C[ic][1]=0;
-			C[ic][2]=0;
-			C[ic][3]=0;
+		if(Ci[0*L+s] < nbh && Ci[1*L+s] < mbh && Ci[2*L+s] < kbh && Ci[0*L+s] >= nbl && Ci[1*L+s] >= mbl && Ci[2*L+s] >= kbl){
+			C[0*L+ic]=0;
+			C[1*L+ic]=0;
+			C[2*L+ic]=0;
+			C[3*L+ic]=0;
 	// Find x coordinate
 			for(a = nbl ; a < nbh ; a = a + (nbh-nbl)/n){
-				if(Ci[s][0]<a){
+				if(Ci[0*L+s]<a){
 					break;
 				}
 				A++;
@@ -227,7 +227,7 @@ void check_inc_C(){
 			A*=100;
 	// Find y coordinate
 			for(a = mbl ; a < mbh ; a = a + (mbh-nbl)/m){
-				if(Ci[s][1]<a){
+				if(Ci[1*L+s]<a){
 					break;
 				}
 				A++;
@@ -235,22 +235,22 @@ void check_inc_C(){
 			A*=100;
 	// Find z coordinate
 			for(a = kbl ; a < kbh ; a = a + (kbh-kbl)/k){
-				if(Ci[s][2]<a){
+				if(Ci[2*L+s]<a){
 					break;
 				}
 				A++;
 			}
-			C[ic][0]=Ci[s][0];
-			C[ic][1]=Ci[s][1];
-			C[ic][2]=Ci[s][2];
-			C[ic][3]=A;
+			C[0*L+ic]=Ci[0*L+s];
+			C[1*L+ic]=Ci[0*L+s];
+			C[2*L+ic]=Ci[0*L+s];
+			C[3*L+ic]=A;
 			ic++;	
 			A=0;
 		}
 	}
-	quicksort(C,0,ic-1);
+	quicksort(C,0,ic-1,L);
 	printf("---Table C---\n");
-	print_table(C,ic,4); 
+	print_table(C,ic,4,L); 
 }
 
 void check_inc_Q(){
@@ -260,18 +260,18 @@ void check_inc_Q(){
 	L = Nq / P;
 	for(s=0;s<L;s++){
 		// if end of real C break
-		if(Qi[s][0]==0 && Qi[s][1]==0 && Qi[s][2]==0){
+		if(Qi[0*L+s]==0 && Qi[1*L+s]==0 && Qi[2*L+s]==0){
 			break;
 		}
 		// if its ok for that process
-		if(Qi[s][0] < nbh && Qi[s][1] < mbh && Qi[s][2] < kbh && Qi[s][0] >= nbl && Qi[s][1] >= mbl && Qi[s][2] >= kbl){
-			C[iq][0]=0;
-			C[iq][1]=0;
-			C[iq][2]=0;
-			C[iq][3]=0;
+		if(Qi[0*L+s]< nbh && Qi[1*L+s] < mbh && Qi[2*L+s] < kbh && Qi[0*L+s] >= nbl && Qi[1*L+s] >= mbl && Qi[2*L+s] >= kbl){
+			Q[0*L+s]=0;
+			Q[1*L+s]=0;
+			Q[2*L+s]=0;
+			Q[3*L+s]=0;
 	// Find x coordinate
 			for(a = nbl ; a < nbh ; a = a + (nbh-nbl)/n){
-				if(Qi[s][0]<a){
+				if(Qi[0*L+s]<a){
 					break;
 				}
 				A++;
@@ -279,7 +279,7 @@ void check_inc_Q(){
 			A*=100;
 	// Find y coordinate
 			for(a = mbl ; a < mbh ; a = a + (mbh-mbl)/m){
-				if(Qi[s][1]<a){
+				if(Qi[1*L+s]<a){
 					break;
 				}
 				A++;
@@ -287,22 +287,22 @@ void check_inc_Q(){
 			A*=100;
 	// Find z coordinate
 			for(a = kbl ; a < kbh ; a = a + (kbh-kbl)/k){
-				if(Qi[s][2]<a){
+				if(Qi[2*L+s]<a){
 					break;
 				}
 				A++;
 			}
-			Q[iq][0]=Qi[s][0];
-			Q[iq][1]=Qi[s][1];
-			Q[iq][2]=Qi[s][2];
-			Q[iq][3]=A;
+			Q[0*L+iq]=Qi[0*L+s];
+			Q[1*L+iq]=Qi[1*L+s];
+			Q[2*L+iq]=Qi[2*L+s];
+			Q[3*L+iq]=A;
 			iq++;	
 			A=0;
 		}
 	}
-	quicksort(Q,0,iq-1);
+	quicksort(Q,0,iq-1,L);
 	printf("---Table Q---\n");
-	print_table(Q,iq,4); 
+	print_table(Q,iq,4,L); 
 }
 
 void make_grid(int rank){
@@ -333,20 +333,17 @@ void make_grid(int rank){
 // Malloc tables
 	
 	L=Nc/P;
-	C =(double **) malloc(L*sizeof(double*));
-	Co = (double **) malloc(L*sizeof(double*));
+	C =(double *) malloc(L*4*sizeof(double));
+	Co = (double *) malloc(L*3*sizeof(double));
 	L=Nq/P;
-	Q =(double **) malloc(L*sizeof(double*));
-	Qo =(double **) malloc(L*sizeof(double*));
+	Q =(double *) malloc(L*4*sizeof(double*));
+	Qo =(double *) malloc(L*3*sizeof(double*));
 	
 
 // Generate C
 
 	L=Nc/P;
 	for( s = 0 ; s < L ; s++ ){
-
-		Co[s] = (double *) malloc(4*sizeof(double));
-		C[s] = (double *) malloc(4*sizeof(double));
 
 		d[0] = (double) rand()/RAND_MAX;
 		d[1] = (double) rand()/RAND_MAX;
@@ -355,10 +352,10 @@ void make_grid(int rank){
 
 	// if the number is ok for this process
 		if( d[0] < nbh && d[1] < mbh && d[2] < kbh && d[0] >= nbl && d[1] >= mbl && d[2] >= kbl ){
-			C[ic][0]=0;
-			C[ic][1]=0;
-			C[ic][2]=0;
-			C[ic][3]=0;
+			C[0*L+ic]=0;
+			C[1*L+ic]=0;
+			C[2*L+ic]=0;
+			C[3*L+ic]=0;
 	// Find x coordinate
 			for(a = nbl ; a < nbh ; a = a + (nbh-nbl)/n){
 				if(d[0]<a){
@@ -382,16 +379,16 @@ void make_grid(int rank){
 				}
 				A++;
 			}
-			C[ic][0]=d[0];
-			C[ic][1]=d[1];
-			C[ic][2]=d[2];
-			C[ic][3]=A;
+			C[0*L+ic]=d[0];
+			C[1*L+ic]=d[1];
+			C[2*L+ic]=d[2];
+			C[3*L+ic]=A;
 			ic++;	
 			A=0;
 		}else{
-			Co[jc][0]=d[0];
-			Co[jc][1]=d[1];
-			Co[jc][2]=d[2];
+			Co[0*L+jc]=d[0];
+			Co[1*L+jc]=d[1];
+			Co[2*L+jc]=d[2];
 			jc++;
 
 		}
@@ -402,8 +399,6 @@ void make_grid(int rank){
 	L=Nq/P;
 	for( s = 0 ; s < L ; s++ ){
 
-		Qo[s] = (double *) malloc(4*sizeof(double));
-		Q[s] = (double *) malloc(4*sizeof(double));
 
 		d[0] = (double) rand()/RAND_MAX;
 		d[1] = (double) rand()/RAND_MAX;
@@ -412,10 +407,11 @@ void make_grid(int rank){
 
 	// if the number is ok for this process
 		if( d[0] < nbh && d[1] < mbh && d[2] < kbh && d[0] >= nbl && d[1] >= mbl && d[2] >= kbl ){
-			Q[iq][0]=0;
-			Q[iq][1]=0;
-			Q[iq][2]=0;
-			Q[iq][3]=0;
+			Q[0*L+iq]=0;
+			Q[1*L+iq]=0;
+			Q[2*L+iq]=0;
+			Q[3*L+iq]=0;
+			
 	// Find x coordinate
 			for(a = nbl ; a < nbh ; a = a + (nbh-nbl)/n){
 				if(d[0]<a){
@@ -439,46 +435,48 @@ void make_grid(int rank){
 				}
 				A++;
 			}
-			Q[iq][0]=d[0];
-			Q[iq][1]=d[1];
-			Q[iq][2]=d[2];
-			Q[iq][3]=A;
+			Q[0*L+iq]=d[0];
+			Q[1*L+iq]=d[1];
+			Q[2*L+iq]=d[2];
+			Q[3*L+iq]=A;
 			iq++;
 			A=0;
 		}else{
-			Qo[jq][0]=d[0];
-			Qo[jq][1]=d[1];
-			Qo[jq][2]=d[2];
+			Qo[0*L+jq]=d[0];
+			Qo[1*L+jq]=d[1];
+			Qo[2*L+jq]=d[2];
 			jq++;
 		}
 	}
 
 
-	quicksort(C,0,ic-1);
-	quicksort(Q,0,iq-1);
+	quicksort(C,0,ic-1,Nc/P);
+	quicksort(Q,0,iq-1,Nq/P);
 	sleep(rank);
+	L=Nc/P;
 	printf("---Table C---\n");
-	print_table(C,ic,4); 
+	print_table(C,ic,4,L); 
 	printf("---Table Co---\n");
-	print_table(Co,jc,3);
+	print_table(Co,jc,3,L);
+	L=Nq/P;
 	printf("---Table Q---\n");
-	print_table(Q,iq,4); 
+	print_table(Q,iq,4,L); 
 	printf("---Table Qo---\n");
-	print_table(Qo,jq,3);
+	print_table(Qo,jq,3,L);
 
 }
 
-void print_table(double **t,int size,int q){
+void print_table(double *t,int x,int y,int size){
 	int i,j;
-	for(i = 0 ; i < size ; i++){
-		for(j = 0 ; j < q; j++){
-			printf("[%d][%d] = %2.10f\t",i,j,t[i][j]);
+	for(i = 0 ; i < x ; i++){
+		for(j = 0 ; j < y; j++){
+			printf("[%d][%d] = %2.10f\t",i,j,t[j*size+i]);
 		}
 		printf("\n");
 	}
 }
 
-void quicksort(double **t,int first,int last){
+void quicksort(double *t,int first,int last,int size){
 	int pivot,j,i,k;
 	double temp;
 
@@ -488,26 +486,26 @@ void quicksort(double **t,int first,int last){
 		j=last;
 
 		while(i<j){
-			while(t[i][3]<=t[pivot][3]&&i<last)
+			while(t[3*size+i]<=t[3*size+pivot]&&i<last)
 				i++;
-			while(t[j][3]>t[pivot][3])
+			while(t[3*size+j]>t[3*size+pivot])
 				j--;
 			if(i<j){
 				for(k=0;k<4;k++){
-					temp=t[i][k];
-					t[i][k]=t[j][k];
-					t[j][k]=temp;
+					temp=t[k*size+i];
+					t[k*size+i]=t[k*size+j];
+					t[k*size+j]=temp;
 				}
 			}
 		}
 		for(k=0;k<4;k++){
-			temp=t[pivot][k];
-			t[pivot][k]=t[j][k];
-			t[j][k]=temp;
+			temp=t[k*size+pivot];
+			t[k*size+pivot]=t[k*size+j];
+			t[k*size+j]=temp;
 		}
 
-		quicksort(t,first,j-1);
-		quicksort(t,j+1,last);
+		quicksort(t,first,j-1,size);
+		quicksort(t,j+1,last,size);
 
 	}
 }
