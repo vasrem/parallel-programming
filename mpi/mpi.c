@@ -50,8 +50,10 @@ void quicksort(double *,int,int,int);
 
 int main(int argc, char **argv){
 	int numtasks, rank; 
+	int temp,i;
 	float buf[6];
-	MPI_Status stats[20];
+	MPI_Status *stats;
+	stats = (MPI_Status *) malloc(128*sizeof(MPI_Status));
 	MPI_Init(&argc,&argv);
 	MPI_Comm_size(MPI_COMM_WORLD, &numtasks);
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -81,8 +83,18 @@ int main(int argc, char **argv){
 	Nq=1<<atoi(argv[2]);
 	gs=1<<atoi(argv[3]);
 	P=1<<atoi(argv[4]);
-	
-	int temp,i;
+
+	Ci=(double **) malloc(Nc*sizeof(double *));
+	Qi=(double **) malloc(Nq*sizeof(double *));
+
+	for(i=0;i<Nc;i++){
+		Ci[i]=(double *) malloc(3*sizeof(double));
+	}
+
+	for(i=0;i<Nq;i++){
+		Qi[i]=(double *) malloc(3*sizeof(double));
+	}
+
 	temp = log( gs ) / log(2);
 	for(i=0;i< temp ; i++){
 		ko++;
@@ -117,9 +129,9 @@ int main(int argc, char **argv){
 	n=1<<(int)n;
 	m=1<<(int)m;
 	k=1<<(int)k;
-	// printf("%d %d %d %d\n",Nc,Nq,gs,P);
-	// printf("n=%f m=%f k=%f\n",n,m,k);
-	// printf("no=%f mo=%f ko=%f\n",no,mo,ko);
+	printf("%d %d %d %d\n",Nc,Nq,gs,P);
+	printf("n=%f m=%f k=%f\n",n,m,k);
+	printf("no=%f mo=%f ko=%f\n",no,mo,ko);
 	if(rank==0){
 		// printf("Number of active processes is %d\n",numtasks);
 		int i=1;
@@ -151,6 +163,11 @@ int main(int argc, char **argv){
 		kbh=buf[5];	// High Z bound
 		// printf("Process #%d\nnl=%f ml=%f kl=%f nh=%f mh=%f kh=%f\n",rank,nbl,mbl,kbl,nbh,mbh,kbh);
 		make_grid(rank);
+		for(i=0;i<jc;i++){
+			MPI_Allgather (&Co[i][0],3,MPI_DOUBLE,&Ci[i][0],3*(numtasks-1),MPI_DOUBLE,MPI_COMM_WORLD);
+		}
+		printf("ARGH");
+
 	}
 
 
