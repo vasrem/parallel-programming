@@ -161,7 +161,7 @@ int main(int argc, char **argv){
 		nbh=buf[3];	// High X bound
 		mbh=buf[4];	// High Y bound
 		kbh=buf[5];	// High Z bound
-		// printf("Process #%d\nnl=%f ml=%f kl=%f nh=%f mh=%f kh=%f\n",rank,nbl,mbl,kbl,nbh,mbh,kbh);
+		 // printf("Process #%d\nnl=%f ml=%f kl=%f nh=%f mh=%f kh=%f\n",rank,nbl,mbl,kbl,nbh,mbh,kbh);
 		make_grid(rank);
 		for(i=0;i<jc;i++){
 			MPI_Allgather (&Co[i][0],3,MPI_DOUBLE,&Ci[i][0],3*(numtasks-1),MPI_DOUBLE,MPI_COMM_WORLD);
