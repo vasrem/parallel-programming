@@ -218,7 +218,7 @@ void check_inc_C(){
 			C[ic][2]=0;
 			C[ic][3]=0;
 	// Find x coordinate
-			for(a = nbl ; a < nbh ; a = a + nbh/n){
+			for(a = nbl ; a < nbh ; a = a + (nbh-nbl)/n){
 				if(Ci[s][0]<a){
 					break;
 				}
@@ -226,7 +226,7 @@ void check_inc_C(){
 			}
 			A*=100;
 	// Find y coordinate
-			for(a = mbl ; a < mbh ; a = a + mbh/m){
+			for(a = mbl ; a < mbh ; a = a + (mbh-nbl)/m){
 				if(Ci[s][1]<a){
 					break;
 				}
@@ -234,7 +234,7 @@ void check_inc_C(){
 			}
 			A*=100;
 	// Find z coordinate
-			for(a = kbl ; a < kbh ; a = a + kbh/k){
+			for(a = kbl ; a < kbh ; a = a + (kbh-kbl)/k){
 				if(Ci[s][2]<a){
 					break;
 				}
@@ -270,7 +270,7 @@ void check_inc_Q(){
 			C[iq][2]=0;
 			C[iq][3]=0;
 	// Find x coordinate
-			for(a = nbl ; a < nbh ; a = a + nbh/n){
+			for(a = nbl ; a < nbh ; a = a + (nbh-nbl)/n){
 				if(Qi[s][0]<a){
 					break;
 				}
@@ -278,7 +278,7 @@ void check_inc_Q(){
 			}
 			A*=100;
 	// Find y coordinate
-			for(a = mbl ; a < mbh ; a = a + mbh/m){
+			for(a = mbl ; a < mbh ; a = a + (mbh-mbl)/m){
 				if(Qi[s][1]<a){
 					break;
 				}
@@ -286,7 +286,7 @@ void check_inc_Q(){
 			}
 			A*=100;
 	// Find z coordinate
-			for(a = kbl ; a < kbh ; a = a + kbh/k){
+			for(a = kbl ; a < kbh ; a = a + (kbh-kbl)/k){
 				if(Qi[s][2]<a){
 					break;
 				}
@@ -417,7 +417,7 @@ void make_grid(int rank){
 			Q[iq][2]=0;
 			Q[iq][3]=0;
 	// Find x coordinate
-			for(a = nbl ; a < nbh ; a = a + nbh/n){
+			for(a = nbl ; a < nbh ; a = a + (nbh-nbl)/n){
 				if(d[0]<a){
 					break;
 				}
@@ -425,7 +425,7 @@ void make_grid(int rank){
 			}
 			A*=100;
 	// Find y coordinate
-			for(a = mbl ; a < mbh ; a = a + mbh/m){
+			for(a = mbl ; a < mbh ; a = a + (mbh-mbl)/m){
 				if(d[1]<a){
 					break;
 				}
@@ -433,7 +433,7 @@ void make_grid(int rank){
 			}
 			A*=100;
 	// Find z coordinate
-			for(a = kbl ; a < kbh ; a = a + kbh/k){
+			for(a = kbl ; a < kbh ; a = a + (kbh-kbl)/k){
 				if(d[2]<a){
 					break;
 				}
