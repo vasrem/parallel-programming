@@ -360,7 +360,7 @@ void make_grid(int rank){
 			C[ic][2]=0;
 			C[ic][3]=0;
 	// Find x coordinate
-			for(a = nbl ; a < nbh ; a = a + nbh/n){
+			for(a = nbl ; a < nbh ; a = a + (nbh-nbl)/n){
 				if(d[0]<a){
 					break;
 				}
@@ -368,7 +368,7 @@ void make_grid(int rank){
 			}
 			A*=100;
 	// Find y coordinate
-			for(a = mbl ; a < mbh ; a = a + mbh/m){
+			for(a = mbl ; a < mbh ; a = a + (mbh-mbl)/m){
 				if(d[1]<a){
 					break;
 				}
@@ -376,7 +376,7 @@ void make_grid(int rank){
 			}
 			A*=100;
 	// Find z coordinate
-			for(a = kbl ; a < kbh ; a = a + kbh/k){
+			for(a = kbl ; a < kbh ; a = a + (kbh-kbl)/k){
 				if(d[2]<a){
 					break;
 				}
