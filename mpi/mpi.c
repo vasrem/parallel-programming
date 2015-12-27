@@ -7,7 +7,7 @@
 #include <unistd.h>
 #include <math.h>
 #include "mpi.h"
- 
+
 int Nc;	// C size 	[21:25]
 int Nq;	// Q size 	[21:25]
 int gs; // n x m x k [12:16]
@@ -39,9 +39,12 @@ float kbl=0;	// Low Z bound
 float nbh=0;	// High X bound
 float mbh=0;	// High Y bound
 float kbh=0;	// High Z bound
+int numtasks, rank; 
 
+struct timeval startwtime, endwtime;
+double seq_time;
 
-void make_grid(int);
+void make_grid();
 void check_inc_C();
 void check_inc_Q();
 void print_table(double *,int,int,int);
@@ -49,40 +52,60 @@ void quicksort(double *,int,int,int);
 
 
 int main(int argc, char **argv){
-	int numtasks, rank; 
+	int temp,i,s;
 	float buf[6];
-	MPI_Status stats[20];
+	MPI_Status *stats;
+	stats = (MPI_Status *) malloc(128*sizeof(MPI_Status));
+	MPI_Group workers;
+	MPI_Comm workers_comm;
 	MPI_Init(&argc,&argv);
 	MPI_Comm_size(MPI_COMM_WORLD, &numtasks);
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	MPI_Comm_group(MPI_COMM_WORLD, &workers);
+	MPI_Group wg;
+	MPI_Comm_group(MPI_COMM_WORLD, &wg);
+	int *ranks;
+	ranks=(int *) malloc((numtasks-1)*sizeof(int));
+	for(i=0;i<numtasks;i++){
+		ranks[i]=i+1;
+		// printf("e%d %d\n",i,ranks[i]);
+	}
+	MPI_Group mg;
+	MPI_Group_incl(wg, numtasks-1, ranks, &mg);
+	MPI_Comm mc;
+	MPI_Comm_create_group(MPI_COMM_WORLD, mg,5550, &mc);
 	if( argc < 5 ){
 		if( argc == 1 ){
 			printf("Usage: %s Nc\n  where Nc is C size (power of two)\n", 
-        	argv[0]);
-        	exit(1);
+				argv[0]);
+			exit(1);
 		}
 		if( argc == 2 ){
 			printf("Usage: %s %s Nq\n  where Nq is Q size (power of two)\n", 
-        	argv[0],argv[1]);
-        	exit(1);
+				argv[0],argv[1]);
+			exit(1);
 		}
 		if( argc == 3 ){
 			printf("Usage: %s %s %s gs\n  where gs= n x m x k is grid size (power of two)\n", 
-        	argv[0],argv[1],argv[2]);
-        	exit(1);
+				argv[0],argv[1],argv[2]);
+			exit(1);
 		}
 		if( argc == 4 ){
 			printf("Usage: %s %s %s %s P\n  where P is number of processes (power of two)\n", 
-        	argv[0],argv[1],argv[2],argv[3]);
-        	exit(1);
+				argv[0],argv[1],argv[2],argv[3]);
+			exit(1);
 		}
 	}
 	Nc=1<<atoi(argv[1]);
 	Nq=1<<atoi(argv[2]);
 	gs=1<<atoi(argv[3]);
 	P=1<<atoi(argv[4]);
-	
-	int temp,i;
+
+	Ci=(double *) malloc((Nc/P)*3*(numtasks-1)*sizeof(double ));
+	Qi=(double *) malloc((Nq/P)*3*(numtasks-1)*sizeof(double ));
+
+
+
 	temp = log( gs ) / log(2);
 	for(i=0;i< temp ; i++){
 		ko++;
@@ -97,6 +120,8 @@ int main(int argc, char **argv){
 		}
 		no++;
 	}
+
+	// Number of all boxes
 	no=1<<(int)no;
 	mo=1<<(int)mo;
 	ko=1<<(int)ko;
@@ -114,12 +139,14 @@ int main(int argc, char **argv){
 		}
 		n++;
 	}
+	// Number of boxes per process
 	n=1<<(int)n;
 	m=1<<(int)m;
 	k=1<<(int)k;
 	// printf("%d %d %d %d\n",Nc,Nq,gs,P);
 	// printf("n=%f m=%f k=%f\n",n,m,k);
 	// printf("no=%f mo=%f ko=%f\n",no,mo,ko);
+	gettimeofday (&startwtime, NULL);
 	if(rank==0){
 		// printf("Number of active processes is %d\n",numtasks);
 		int i=1;
@@ -134,7 +161,7 @@ int main(int argc, char **argv){
 				for(s3=0;s3<1;s3+=k/ko){
 					buf[2]=s3;
 					buf[5]=s3+(k/ko);
-					printf("%f %f %f %f %f %f\n",buf[0],buf[1],buf[2],buf[3],buf[4],buf[5]);
+					// printf("%f %f %f %f %f %f\n",buf[0],buf[1],buf[2],buf[3],buf[4],buf[5]);
 					MPI_Send(&buf[0],6,MPI_FLOAT,i,i,MPI_COMM_WORLD);
 					i++;
 				}	
@@ -149,77 +176,101 @@ int main(int argc, char **argv){
 		nbh=buf[3];	// High X bound
 		mbh=buf[4];	// High Y bound
 		kbh=buf[5];	// High Z bound
-		// printf("Process #%d\nnl=%f ml=%f kl=%f nh=%f mh=%f kh=%f\n",rank,nbl,mbl,kbl,nbh,mbh,kbh);
-		make_grid(rank);
+		printf("Process #%d\nnl=%f ml=%f kl=%f nh=%f mh=%f kh=%f\n",rank,nbl,mbl,kbl,nbh,mbh,kbh);
+		make_grid();
+		
+		if(numtasks>2){
+			MPI_Barrier(mc);
+			MPI_Allgather(&Co[0],(Nc/P)*3,MPI_DOUBLE,&Ci[0],(Nc/P)*3,MPI_DOUBLE,mc);	
+			MPI_Barrier(mc);
+			MPI_Allgather(&Qo[0],(Nq/P)*3,MPI_DOUBLE,&Qi[0],(Nq/P)*3,MPI_DOUBLE,mc);
+			MPI_Barrier(mc);
+			for(i=1;i<numtasks;i++){
+				if(rank==i){
+					L=Nc/P;
+					printf("\n\t-------RANK=%d--------\n",rank);
+					printf("\n---Table C---\n");
+					print_table(C,ic,4,L); 
+					printf("---Table Co---\n");
+					print_table(Co,jc,3,L);
+					L=Nq/P;
+					printf("---Table Q---\n");
+					print_table(Q,iq,4,L); 
+					printf("---Table Qo---\n");
+					print_table(Qo,jq,3,L);
+				}
+				MPI_Barrier(mc);
+			}
+			MPI_Barrier(mc);
+			if(rank==1){
+				printf("\n");
+				for(i=0;i<(Nc/P)*3*(numtasks-1);i++){
+					printf("%f\t",Ci[i]);
+				}
+				printf("\n\n");
+				for(i=0;i<(Nq/P)*3*(numtasks-1);i++){
+					printf("%f\t",Qi[i]);
+				}
+				printf("\n");
+			}
+			MPI_Barrier(mc);
+			check_inc_C();
+			check_inc_Q();
+
+			for(i=1;i<numtasks;i++){
+				if(rank==i){
+					printf("\n\t-------RANK=%d--------\n",rank);
+					printf("---Table C---\n");
+					print_table(C,ic,4,L); 
+					printf("---Table Q---\n");
+					print_table(Q,iq,4,L); 
+				}
+				MPI_Barrier(mc);
+			}
+		}
+		gettimeofday (&endwtime, NULL);
 	}
+	if(rank==1){
+		seq_time = (double)((endwtime.tv_usec - startwtime.tv_usec)/1.0e6
+			+ endwtime.tv_sec - startwtime.tv_sec);
 
-
-	// make_grid();
-	
-
-
-	// // --------
-	// // PROXEIRO
-	// // ---------
-	// L=Nc/P;
-	// int s;
-	// i=0;
-	// Ci = (double **) malloc(L*sizeof(double*));
-	// // Temp table of rand numbers
-	// double *d;
-	// d =(double *) malloc(3*sizeof(double));
-	// // srand setup 
-	// struct timeval time; 
-	// gettimeofday(&time,NULL);
-	// srand((time.tv_sec * 1500) + (time.tv_usec / 1500));
-
-	// for( s = 0 ; s < L ; s++ ){
-	// 	Ci[s] = (double *) malloc(4*sizeof(double));
-
-	// 	d[0] = (double) rand()/RAND_MAX;
-	// 	d[1] = (double) rand()/RAND_MAX;
-	// 	d[2] = (double) rand()/RAND_MAX;
-	// 	// printf("C:%0.10f\t%0.10f\t%0.10f\t\n",d[0],d[1],d[2]);
-
-	// // if the number is ok for this process
-	// 	if( d[0] < 1 && d[1] < 1 && d[2] < 1 && d[0] >= 0 && d[1] >= 0 && d[2] >= 0 ){
-	// 		Ci[i][0]=d[0];
-	// 		Ci[i][1]=d[1];
-	// 		Ci[i][2]=d[2];
-	// 		i++;
-	// 	}
-	// }
-	// printf("---Table Ci---\n");
-	// print_table(Ci,i,3);
-	// check_inc_C();
-
-	// // --------
-	// // PROXEIRO
-	// // ---------
+		printf("Make grid time : %f\n",seq_time);
+	}
 	MPI_Finalize();
 
 }
 
 void check_inc_C(){
-	int s;
+	int s,z=0;
 	int A=0;
 	double a;
-	L = Nc / P;
-	printf("nl=%f ml=%f kl=%f nh=%f mh=%f kh=%f\n",nbl,mbl,kbl,nbh,mbh,kbh);
-	for(s=0;s<L;s++){
-		// if end of real C break
-		if(Ci[0*L+s]==0 && Ci[1*L+s]==0 && Ci[2*L+s]==0){
+	L = (Nc / P);
+	for(s=0;s<=L;s++){
+		// if its not out of limits
+		if(ic>=L){
 			break;
 		}
+		// printf("%d %d %d\n",z*L+s,(z+1)*L+s,(z+2)*L+s);
+		// Jump to the next subtable when zeros
+		if((Ci[z*L+s]==0 && Ci[(z+1)*L+s]==0 && Ci[(z+2)*L+s]==0) || s==L){
+			z+=3;
+			if(z<=(numtasks-1)*3){
+				s=-1;
+				continue;
+			}else{
+				break;
+			}
+			
+		}
 		// if its ok for that process
-		if(Ci[0*L+s] < nbh && Ci[1*L+s] < mbh && Ci[2*L+s] < kbh && Ci[0*L+s] >= nbl && Ci[1*L+s] >= mbl && Ci[2*L+s] >= kbl){
+		if(Ci[z*L+s] < nbh && Ci[(z+1)*L+s] < mbh && Ci[(z+2)*L+s] < kbh && Ci[z*L+s] >= nbl && Ci[(z+1)*L+s] >= mbl && Ci[(z+2)*L+s] >= kbl){
 			C[0*L+ic]=0;
 			C[1*L+ic]=0;
 			C[2*L+ic]=0;
 			C[3*L+ic]=0;
 	// Find x coordinate
 			for(a = nbl ; a < nbh ; a = a + (nbh-nbl)/n){
-				if(Ci[0*L+s]<a){
+				if(Ci[z*L+s]<a){
 					break;
 				}
 				A++;
@@ -227,7 +278,7 @@ void check_inc_C(){
 			A*=100;
 	// Find y coordinate
 			for(a = mbl ; a < mbh ; a = a + (mbh-nbl)/m){
-				if(Ci[1*L+s]<a){
+				if(Ci[(z+1)*L+s]<a){
 					break;
 				}
 				A++;
@@ -235,51 +286,63 @@ void check_inc_C(){
 			A*=100;
 	// Find z coordinate
 			for(a = kbl ; a < kbh ; a = a + (kbh-kbl)/k){
-				if(Ci[2*L+s]<a){
+				if(Ci[(z+2)*L+s]<a){
 					break;
 				}
 				A++;
 			}
-			C[0*L+ic]=Ci[0*L+s];
-			C[1*L+ic]=Ci[0*L+s];
-			C[2*L+ic]=Ci[0*L+s];
+			C[0*L+ic]=Ci[z*L+s];
+			C[1*L+ic]=Ci[(z+1)*L+s];
+			C[2*L+ic]=Ci[(z+2)*L+s];
 			C[3*L+ic]=A;
 			ic++;	
 			A=0;
 		}
 	}
+	// sleep(2*rank);
 	quicksort(C,0,ic-1,L);
-	printf("---Table C---\n");
-	print_table(C,ic,4,L); 
+	
 }
 
 void check_inc_Q(){
-	int s;
+	int s,z=0;
 	int A=0;
 	double a;
-	L = Nq / P;
-	for(s=0;s<L;s++){
-		// if end of real C break
-		if(Qi[0*L+s]==0 && Qi[1*L+s]==0 && Qi[2*L+s]==0){
+	L = (Nq / P);
+	for(s=0;s<=L;s++){
+		// if its not out of limits
+		if(iq>=L){
 			break;
 		}
+		// printf("%d %d %d\n",z*L+s,(z+1)*L+s,(z+2)*L+s);
+		// Jump to the next subtable when zeros
+		if((Qi[z*L+s]==0 && Qi[(z+1)*L+s]==0 && Qi[(z+2)*L+s]==0) || s==L){
+			z+=3;
+			if(z<=(numtasks-1)*3){
+				s=-1;
+				continue;
+			}else{
+				break;
+			}
+			
+		}
 		// if its ok for that process
-		if(Qi[0*L+s]< nbh && Qi[1*L+s] < mbh && Qi[2*L+s] < kbh && Qi[0*L+s] >= nbl && Qi[1*L+s] >= mbl && Qi[2*L+s] >= kbl){
-			Q[0*L+s]=0;
-			Q[1*L+s]=0;
-			Q[2*L+s]=0;
-			Q[3*L+s]=0;
+		if(Qi[z*L+s] < nbh && Qi[(z+1)*L+s] < mbh && Qi[(z+2)*L+s] < kbh && Qi[z*L+s] >= nbl && Qi[(z+1)*L+s] >= mbl && Qi[(z+2)*L+s] >= kbl){
+			Q[0*L+iq]=0;
+			Q[1*L+iq]=0;
+			Q[2*L+iq]=0;
+			Q[3*L+iq]=0;
 	// Find x coordinate
 			for(a = nbl ; a < nbh ; a = a + (nbh-nbl)/n){
-				if(Qi[0*L+s]<a){
+				if(Qi[z*L+s]<a){
 					break;
 				}
 				A++;
 			}
 			A*=100;
 	// Find y coordinate
-			for(a = mbl ; a < mbh ; a = a + (mbh-mbl)/m){
-				if(Qi[1*L+s]<a){
+			for(a = mbl ; a < mbh ; a = a + (mbh-nbl)/m){
+				if(Qi[(z+1)*L+s]<a){
 					break;
 				}
 				A++;
@@ -287,25 +350,27 @@ void check_inc_Q(){
 			A*=100;
 	// Find z coordinate
 			for(a = kbl ; a < kbh ; a = a + (kbh-kbl)/k){
-				if(Qi[2*L+s]<a){
+				if(Qi[(z+2)*L+s]<a){
 					break;
 				}
 				A++;
 			}
-			Q[0*L+iq]=Qi[0*L+s];
-			Q[1*L+iq]=Qi[1*L+s];
-			Q[2*L+iq]=Qi[2*L+s];
+			Q[0*L+iq]=Qi[z*L+s];
+			Q[1*L+iq]=Qi[(z+1)*L+s];
+			Q[2*L+iq]=Qi[(z+2)*L+s];
 			Q[3*L+iq]=A;
 			iq++;	
 			A=0;
 		}
 	}
+	// sleep(2*rank);
 	quicksort(Q,0,iq-1,L);
-	printf("---Table Q---\n");
-	print_table(Q,iq,4,L); 
+	
+
+
 }
 
-void make_grid(int rank){
+void make_grid(){
 
 	int s,q;
 	double a;
@@ -328,7 +393,7 @@ void make_grid(int rank){
 // srand setup 
 	struct timeval time; 
 	gettimeofday(&time,NULL);
-	srand((time.tv_sec * 1000) + (time.tv_usec / 1000));
+	srand((time.tv_sec * 1000)*rank + (time.tv_usec / 1000)*rank);
 
 // Malloc tables
 	
@@ -336,26 +401,32 @@ void make_grid(int rank){
 	C =(double *) malloc(L*4*sizeof(double));
 	Co = (double *) malloc(L*3*sizeof(double));
 	L=Nq/P;
-	Q =(double *) malloc(L*4*sizeof(double*));
-	Qo =(double *) malloc(L*3*sizeof(double*));
-	
-
-// Generate C
-
+	Q =(double *) malloc(L*4*sizeof(double));
+	Qo =(double *) malloc(L*3*sizeof(double));
+	// printf("# of boxes: %f %f %f \n",(nbh-nbl)/n,(mbh-mbl)/m,(kbh-kbl)/k);
+	//printf("Lc=%d  Lq=%d\n",Nc/P,Nq/P);
+	// zero to everything
+	for(s=0; s < L*4;s++){
+		C[s]=0;
+		Q[s]=0;
+		if(s<L*3){
+			Co[s]=0;
+			Qo[s]=0;
+		}
+	}
+	// Generate C
 	L=Nc/P;
 	for( s = 0 ; s < L ; s++ ){
-
 		d[0] = (double) rand()/RAND_MAX;
 		d[1] = (double) rand()/RAND_MAX;
 		d[2] = (double) rand()/RAND_MAX;
-		//printf("C:%0.10f\t%0.10f\t%0.10f\t\n",d[0],d[1],d[2]);
-
+		// printf("C[%d]:%0.10f\t%0.10f\t%0.10f\t\n",rank,d[0],d[1],d[2]);
 	// if the number is ok for this process
 		if( d[0] < nbh && d[1] < mbh && d[2] < kbh && d[0] >= nbl && d[1] >= mbl && d[2] >= kbl ){
-			C[0*L+ic]=0;
-			C[1*L+ic]=0;
-			C[2*L+ic]=0;
-			C[3*L+ic]=0;
+			// C[0*L+ic]=0;
+			// C[1*L+ic]=0;
+			// C[2*L+ic]=0;
+			// C[3*L+ic]=0;
 	// Find x coordinate
 			for(a = nbl ; a < nbh ; a = a + (nbh-nbl)/n){
 				if(d[0]<a){
@@ -390,7 +461,9 @@ void make_grid(int rank){
 			Co[1*L+jc]=d[1];
 			Co[2*L+jc]=d[2];
 			jc++;
-
+			// Co[0*L+jc]=0;
+			// Co[1*L+jc]=0;
+			// Co[2*L+jc]=0;
 		}
 	}
 
@@ -403,14 +476,14 @@ void make_grid(int rank){
 		d[0] = (double) rand()/RAND_MAX;
 		d[1] = (double) rand()/RAND_MAX;
 		d[2] = (double) rand()/RAND_MAX;
-	 	//printf("Q:%0.10f\t%0.10f\t%0.10f\t\n",d[0],d[1],d[2]);
+	 	// printf("Q[%d]:%0.10f\t%0.10f\t%0.10f\t\n",rank,d[0],d[1],d[2]);
 
 	// if the number is ok for this process
 		if( d[0] < nbh && d[1] < mbh && d[2] < kbh && d[0] >= nbl && d[1] >= mbl && d[2] >= kbl ){
-			Q[0*L+iq]=0;
-			Q[1*L+iq]=0;
-			Q[2*L+iq]=0;
-			Q[3*L+iq]=0;
+			// Q[0*L+iq]=0;
+			// Q[1*L+iq]=0;
+			// Q[2*L+iq]=0;
+			// Q[3*L+iq]=0;
 			
 	// Find x coordinate
 			for(a = nbl ; a < nbh ; a = a + (nbh-nbl)/n){
@@ -446,23 +519,27 @@ void make_grid(int rank){
 			Qo[1*L+jq]=d[1];
 			Qo[2*L+jq]=d[2];
 			jq++;
+			// Qo[0*L+jq]=0;
+			// Qo[1*L+jq]=0;
+			// Qo[2*L+jq]=0;
 		}
+
 	}
 
 
 	quicksort(C,0,ic-1,Nc/P);
 	quicksort(Q,0,iq-1,Nq/P);
-	sleep(rank);
-	L=Nc/P;
-	printf("---Table C---\n");
-	print_table(C,ic,4,L); 
-	printf("---Table Co---\n");
-	print_table(Co,jc,3,L);
-	L=Nq/P;
-	printf("---Table Q---\n");
-	print_table(Q,iq,4,L); 
-	printf("---Table Qo---\n");
-	print_table(Qo,jq,3,L);
+	// sleep(rank);
+
+	// printf("rank=%d\n",rank);
+	// for(s=0;s<L*4;s++){
+	// 	printf("%f ",C[s]);
+	// }
+	// printf("---CO---\n");
+	// for(s=0;s<L*3;s++){
+	// 	printf("%f ",Co[s]);
+	// }
+	
 
 }
 
