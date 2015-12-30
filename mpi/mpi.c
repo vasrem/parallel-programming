@@ -49,6 +49,7 @@ void check_inc_C();
 void check_inc_Q();
 void print_table(double *,int,int,int);
 void quicksort(double *,int,int,int);
+void search_nn();
 
 
 int main(int argc, char **argv){
@@ -146,7 +147,7 @@ int main(int argc, char **argv){
 	// printf("%d %d %d %d\n",Nc,Nq,gs,P);
 	// printf("n=%f m=%f k=%f\n",n,m,k);
 	// printf("no=%f mo=%f ko=%f\n",no,mo,ko);
-	gettimeofday (&startwtime, NULL);
+	
 	if(rank==0){
 		// printf("Number of active processes is %d\n",numtasks);
 		int i=1;
@@ -177,6 +178,7 @@ int main(int argc, char **argv){
 		mbh=buf[4];	// High Y bound
 		kbh=buf[5];	// High Z bound
 		printf("Process #%d\nnl=%f ml=%f kl=%f nh=%f mh=%f kh=%f\n",rank,nbl,mbl,kbl,nbh,mbh,kbh);
+		gettimeofday (&startwtime, NULL);
 		make_grid();
 		
 		if(numtasks>2){
@@ -184,39 +186,39 @@ int main(int argc, char **argv){
 			MPI_Allgather(&Co[0],(Nc/P)*3,MPI_DOUBLE,&Ci[0],(Nc/P)*3,MPI_DOUBLE,mc);	
 			MPI_Barrier(mc);
 			MPI_Allgather(&Qo[0],(Nq/P)*3,MPI_DOUBLE,&Qi[0],(Nq/P)*3,MPI_DOUBLE,mc);
-			MPI_Barrier(mc);
-			for(i=1;i<numtasks;i++){
-				if(rank==i){
-					L=Nc/P;
-					printf("\n\t-------RANK=%d--------\n",rank);
-					printf("\n---Table C---\n");
-					print_table(C,ic,4,L); 
-					printf("---Table Co---\n");
-					print_table(Co,jc,3,L);
-					L=Nq/P;
-					printf("---Table Q---\n");
-					print_table(Q,iq,4,L); 
-					printf("---Table Qo---\n");
-					print_table(Qo,jq,3,L);
-				}
-				MPI_Barrier(mc);
-			}
-			MPI_Barrier(mc);
-			if(rank==1){
-				printf("\n");
-				for(i=0;i<(Nc/P)*3*(numtasks-1);i++){
-					printf("%f\t",Ci[i]);
-				}
-				printf("\n\n");
-				for(i=0;i<(Nq/P)*3*(numtasks-1);i++){
-					printf("%f\t",Qi[i]);
-				}
-				printf("\n");
-			}
+			// MPI_Barrier(mc);
+			// for(i=1;i<numtasks;i++){
+			// 	if(rank==i){
+			// 		L=Nc/P;
+			// 		printf("\n\t-------RANK=%d--------\n",rank);
+			// 		printf("\n---Table C---\n");
+			// 		print_table(C,ic,4,L); 
+			// 		printf("---Table Co---\n");
+			// 		print_table(Co,jc,3,L);
+			// 		L=Nq/P;
+			// 		printf("---Table Q---\n");
+			// 		print_table(Q,iq,4,L); 
+			// 		printf("---Table Qo---\n");
+			// 		print_table(Qo,jq,3,L);
+			// 	}
+			// 	MPI_Barrier(mc);
+			// }
+			// MPI_Barrier(mc);
+			// if(rank==1){
+			// 	printf("\n");
+			// 	for(i=0;i<(Nc/P)*3*(numtasks-1);i++){
+			// 		printf("%f\t",Ci[i]);
+			// 	}
+			// 	printf("\n\n");
+			// 	for(i=0;i<(Nq/P)*3*(numtasks-1);i++){
+			// 		printf("%f\t",Qi[i]);
+			// 	}
+			// 	printf("\n");
+			// }
 			MPI_Barrier(mc);
 			check_inc_C();
 			check_inc_Q();
-
+			MPI_Barrier(mc);
 			for(i=1;i<numtasks;i++){
 				if(rank==i){
 					printf("\n\t-------RANK=%d--------\n",rank);
@@ -229,22 +231,137 @@ int main(int argc, char **argv){
 			}
 		}
 		gettimeofday (&endwtime, NULL);
-	}
-	if(rank==1){
-		seq_time = (double)((endwtime.tv_usec - startwtime.tv_usec)/1.0e6
-			+ endwtime.tv_sec - startwtime.tv_sec);
+		if(rank==1){
+			seq_time = (double)((endwtime.tv_usec - startwtime.tv_usec)/1.0e6
+				+ endwtime.tv_sec - startwtime.tv_sec);
 
-		printf("Make grid time : %f\n",seq_time);
+			printf("Make grid time : %f\n",seq_time);
+		}
+
+		// Search
+
+		search_nn();
+
 	}
+	
 	MPI_Finalize();
 
 }
+void search_nn(){
+	sleep(rank);
+	int i,j,s,z;
+	double temp;
+	// min value and index.
+	double min=1;
+	int mini=0;
+	for(i=0;i<iq;i++){
+		printf("Check for -> %f %f %f %f\n",Q[0*(Nq/P)+i],Q[1*(Nq/P)+i],Q[2*(Nq/P)+i],Q[3*(Nq/P)+i]);
+		for(j=0;j<ic;j++){
+			// Check if its in the same box.
+			if(Q[3*(Nq/P)+i]==C[3*(Nc/P)+j]){
+				z=5;
+				temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+				printf("%f\n",temp);
+				if(min>temp){
+					min=temp;
+					mini=j;
+				}
+			}
+			// else{
+			// 	break;
+			// }
+			// the min distance with the distance of Q[{0,1,2}*5+i] from the bounds.
+		}
+		if( fabs( Q[0*(Nc/P)+i] - C[0*(Nq/P)+mini] ) > fabs( Q[0*(Nq/P)+i] - (n/no) * (i+1) ) ){
+			// na koitaw an uparxei auto to kouti se auto to process
+			// ---- an uparxei tote vriskw to kainourgio min sugkrinontas to Q[0*5+i] me ola ta C tou allou koutiou 
+			// kai sigkrinw me to min p vrika parapanw[ line :104 ]
+			// ---- an den uparxei tote 8a prepei na zitaw apo to process p einai dipla m, analoga me ta bounds, to C tou kai na sigkrinw to Q[0*5+i]
+			// me to C tou swstou koutiou tou allou process.
+			// printf("check xxh %i =%d\n",i,(int)(Q[3*(Nq/P)+i]+10000)/10000);
+			if((int)(Q[3*(Nq/P)+i]+10000)/10000<=(no/n)){
+				// printf("Maybe nearest to %f\n",Q[3*(Nq/P)+i]+10000);
+				// check sto kouti me Q[3*(Nq/P)+i]+10000 sto C[3*5+j]
+			}else{
+				// mpi rcv to rank+(mxk) opou m kai k se posa koutia spaei i ka8e diastasi ka8e fora.
+				// psakse sta akriana apo ta mikra
+			}
+		}
+		if( fabs( Q[0*(Nc/P)+i] - C[0*(Nq/P)+mini] ) > fabs( Q[0*(Nq/P)+i] - (n/no) * (i) ) ){
+			// printf("check xxl %i =%d\n",i,(int)(Q[3*(Nq/P)+i]-10000)/10000);
+				// printf("Maybe nearest to %f\n",Q[3*(Nq/P)+i]-10000);
+			if((int)(Q[3*(Nq/P)+i]-10000)/10000>=1){
+				// check sto kouti me Q[3*(Nq/P)+i]-10000 sto C[3*(Nc/P)+j] 
+			}else{
+				// mpi rcv to rank-(mxk)
+				// psakse sta akriana apo ta megala
+			}
+		}
+		//rdy
+		if( fabs( Q[1*(Nc/P)+i] - C[1*(Nq/P)+mini] ) > fabs( Q[1*(Nq/P)+i] - (m/mo) * (i+1) ) ){
+			// printf("Maybe nearest to %f\n",Q[3*(Nq/P)+i]+100);
+			// printf("check yyh %i =%d\n",i,((((int)Q[3*(Nq/P)+i])%10000)+100)/100);
+			if(((((int)Q[3*(Nq/P)+i])%10000)+100)/100<=(mo/m)){
+				// check sto kouti me Q[3*(Nq/P)+i]+100 sto C[3*(Nc/P)+j]
+			}else{
+				// mpi rcv to rank+k
+				// psakse sta akriana apo ta mikra
+			}
+		}
+		if( fabs( Q[1*(Nc/P)+i] - C[1*(Nq/P)+mini] ) > fabs( Q[1*(Nq/P)+i] - (m/mo) * (i) ) ){
+			// printf("Maybe nearest to %f\n",Q[3*(Nq/P)+i]-100);
+			// printf("check yyl %i =%d\n",i,((((int)Q[3*(Nq/P)+i])%10000)-100)/100);
+			if(((((int)Q[3*(Nq/P)+i])%10000)-100)/100>=1){
+				// check sto kouti me Q[3*(Nq/P)+i]-100 sto C[3*(Nc/P)+j]
+			}else{
+				// mpi rcv to rank-k
+				// psakse sta akriana apo ta megala
+			}
+		}
+		if( fabs( Q[2*(Nc/P)+i] - C[2*(Nq/P)+mini] ) > fabs( Q[2*(Nq/P)+i] - (k/ko) * (i+1) ) ){
+			// printf("Maybe nearest to %f\n",Q[3*5+i]+1);
+			// printf("check zzh %i =%d\n",i,((((int)Q[3*(Nq/P)+i])%100)+1));
+			if(((((int)Q[3*(Nq/P)+i])%100)+1)<=(k/ko)){
+
+				// check sto kouti me Q[3*5+i]+1 sto C[3*(Nc/P)+j]
+			}else{
+				// mpi rcv to rank+1
+				// psakse sto idio kouti me to C[3*5+i]
+			}
+		}
+		if( fabs( Q[2*(Nc/P)+i] - C[2*(Nq/P)+mini] ) > fabs( Q[2*(Nq/P)+i] - (k/ko) * (i) ) ){
+			// printf("Maybe nearest to %f\n",Q[3*5+i]-1);
+			// printf("check zzl %i =%d\n",i,((((int)Q[3*(Nq/P)+i])%100)-1));
+			if(((((int)Q[3*(Nq/P)+i])%100)-1)>=1){
+				// check sto kouti me Q[3*5+i]-1 sto C[3*(Nc/P)+j]
+			}else{
+				// mpi rcv to rank-1
+				// psakse sto idio kouti me to C[3*5+i]
+			}
+		}
+		if(z==5){
+			printf("Kontinoteros %d -> %f %f %f %f\n",mini,C[0*(Nq/P)+mini],C[1*(Nq/P)+mini],C[2*(Nq/P)+mini],C[3*(Nq/P)+mini]);
+			min=1;
+			mini=0;
+			z=0;
+		}
+	}
+}
+
 
 void check_inc_C(){
 	int s,z=0;
 	int A=0;
 	double a;
 	L = (Nc / P);
+
+	double *d;
+	d =(double *) malloc(3*sizeof(double));
+
+	struct timeval time; 
+	gettimeofday(&time,NULL);
+	srand((time.tv_sec * 1000)*(rank+1) + (time.tv_usec / 1000)*(rank+1));
+
 	for(s=0;s<=L;s++){
 		// if its not out of limits
 		if(ic>=L){
@@ -299,6 +416,40 @@ void check_inc_C(){
 			A=0;
 		}
 	}
+	// for(s=ic;s<L;s++){
+	// 	d[0] =nbl +((double) rand()/RAND_MAX)*(nbh-nbl);
+	// 	d[1] =mbl +((double) rand()/RAND_MAX)*(mbh-mbl);
+	// 	d[2] =kbl +((double) rand()/RAND_MAX)*(kbh-kbl);
+	// 	for(a = nbl ; a < nbh ; a = a + (nbh-nbl)/n){
+	// 		if(d[0]<a){
+	// 			break;
+	// 		}
+	// 		A++;
+	// 	}
+	// 	A*=100;
+	// // Find y coordinate
+	// 	for(a = mbl ; a < mbh ; a = a + (mbh-mbl)/m){
+	// 		if(d[1]<a){
+	// 			break;
+	// 		}
+	// 		A++;
+	// 	}
+	// 	A*=100;
+	// // Find z coordinate
+	// 	for(a = kbl ; a < kbh ; a = a + (kbh-kbl)/k){
+	// 		if(d[2]<a){
+	// 			break;
+	// 		}
+	// 		A++;
+	// 	}
+	// 	C[0*L+ic]=d[0];
+	// 	C[1*L+ic]=d[1];
+	// 	C[2*L+ic]=d[2];
+	// 	C[3*L+ic]=A;
+	// 	ic++;
+	// 	A=0;
+	// }
+
 	// sleep(2*rank);
 	quicksort(C,0,ic-1,L);
 	
@@ -309,6 +460,14 @@ void check_inc_Q(){
 	int A=0;
 	double a;
 	L = (Nq / P);
+
+	double *d;
+	d =(double *) malloc(3*sizeof(double));
+
+	struct timeval time; 
+	gettimeofday(&time,NULL);
+	srand((time.tv_sec * 1000)*(rank+1) + (time.tv_usec / 1000)*(rank+1));
+
 	for(s=0;s<=L;s++){
 		// if its not out of limits
 		if(iq>=L){
@@ -363,6 +522,39 @@ void check_inc_Q(){
 			A=0;
 		}
 	}
+	// for(s=iq;s<L;s++){
+	// 	d[0] =nbl +((double) rand()/RAND_MAX)*(nbh-nbl);
+	// 	d[1] =mbl +((double) rand()/RAND_MAX)*(mbh-mbl);
+	// 	d[2] =kbl +((double) rand()/RAND_MAX)*(kbh-kbl);
+	// 	for(a = nbl ; a < nbh ; a = a + (nbh-nbl)/n){
+	// 		if(d[0]<a){
+	// 			break;
+	// 		}
+	// 		A++;
+	// 	}
+	// 	A*=100;
+	// // Find y coordinate
+	// 	for(a = mbl ; a < mbh ; a = a + (mbh-mbl)/m){
+	// 		if(d[1]<a){
+	// 			break;
+	// 		}
+	// 		A++;
+	// 	}
+	// 	A*=100;
+	// // Find z coordinate
+	// 	for(a = kbl ; a < kbh ; a = a + (kbh-kbl)/k){
+	// 		if(d[2]<a){
+	// 			break;
+	// 		}
+	// 		A++;
+	// 	}
+	// 	Q[0*L+iq]=d[0];
+	// 	Q[1*L+iq]=d[1];
+	// 	Q[2*L+iq]=d[2];
+	// 	Q[3*L+iq]=A;
+	// 	iq++;
+	// 	A=0;
+	// }
 	// sleep(2*rank);
 	quicksort(Q,0,iq-1,L);
 	
