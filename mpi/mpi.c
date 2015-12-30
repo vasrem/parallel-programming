@@ -219,6 +219,10 @@ int main(int argc, char **argv){
 			check_inc_C();
 			check_inc_Q();
 			MPI_Barrier(mc);
+			free(Ci);
+			free(Qi);
+			free(Co);
+			free(Qo);
 			for(i=1;i<numtasks;i++){
 				if(rank==i){
 					printf("\n\t-------RANK=%d--------\n",rank);
@@ -272,7 +276,13 @@ void search_nn(){
 			// }
 			// the min distance with the distance of Q[{0,1,2}*5+i] from the bounds.
 		}
-		if( fabs( Q[0*(Nc/P)+i] - C[0*(Nq/P)+mini] ) > fabs( Q[0*(Nq/P)+i] - (n/no) * (i+1) ) ){
+		printf("Bound nbh:%f %f\n",fabs( Q[0*(Nc/P)+i] - C[0*(Nq/P)+mini] ),fabs( Q[0*(Nq/P)+i] - nbh ) );
+		printf("Bound nbl:%f %f\n",fabs( Q[0*(Nc/P)+i] - C[0*(Nq/P)+mini] ),fabs( Q[0*(Nq/P)+i] - nbl ) );
+		printf("Bound mbh:%f %f\n",fabs( Q[1*(Nc/P)+i] - C[1*(Nq/P)+mini] ),fabs( Q[1*(Nq/P)+i] - mbh ) );
+		printf("Bound mbl:%f %f\n",fabs( Q[1*(Nc/P)+i] - C[1*(Nq/P)+mini] ),fabs( Q[1*(Nq/P)+i] - mbl ) );
+		printf("Bound kbh:%f %f\n",fabs( Q[2*(Nc/P)+i] - C[2*(Nq/P)+mini] ),fabs( Q[2*(Nq/P)+i] - kbh ) );
+		printf("Bound kbl:%f %f\n",fabs( Q[2*(Nc/P)+i] - C[2*(Nq/P)+mini] ),fabs( Q[2*(Nq/P)+i] - kbl ) );
+		if( fabs( Q[0*(Nc/P)+i] - C[0*(Nq/P)+mini] ) > fabs( Q[0*(Nq/P)+i] - nbh ) ){
 			// na koitaw an uparxei auto to kouti se auto to process
 			// ---- an uparxei tote vriskw to kainourgio min sugkrinontas to Q[0*5+i] me ola ta C tou allou koutiou 
 			// kai sigkrinw me to min p vrika parapanw[ line :104 ]
@@ -282,58 +292,123 @@ void search_nn(){
 			if((int)(Q[3*(Nq/P)+i]+10000)/10000<=(no/n)){
 				// printf("Maybe nearest to %f\n",Q[3*(Nq/P)+i]+10000);
 				// check sto kouti me Q[3*(Nq/P)+i]+10000 sto C[3*5+j]
+				for(j=0;j<ic;j++){
+					if((Q[3*(Nq/P)+i]+10000)==C[3*(Nc/P)+j]){
+						z=5;
+						temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+						printf("%f\n",temp);
+						if(min>temp){
+							min=temp;
+							mini=j;
+						}
+					}
+				}
 			}else{
 				// mpi rcv to rank+(mxk) opou m kai k se posa koutia spaei i ka8e diastasi ka8e fora.
 				// psakse sta akriana apo ta mikra
 			}
 		}
-		if( fabs( Q[0*(Nc/P)+i] - C[0*(Nq/P)+mini] ) > fabs( Q[0*(Nq/P)+i] - (n/no) * (i) ) ){
+		if( fabs( Q[0*(Nc/P)+i] - C[0*(Nq/P)+mini] ) > fabs( Q[0*(Nq/P)+i] - nbl ) ){
 			// printf("check xxl %i =%d\n",i,(int)(Q[3*(Nq/P)+i]-10000)/10000);
 				// printf("Maybe nearest to %f\n",Q[3*(Nq/P)+i]-10000);
 			if((int)(Q[3*(Nq/P)+i]-10000)/10000>=1){
 				// check sto kouti me Q[3*(Nq/P)+i]-10000 sto C[3*(Nc/P)+j] 
+				for(j=0;j<ic;j++){
+					if((Q[3*(Nq/P)+i]-10000)==C[3*(Nc/P)+j]){
+						z=5;
+						temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+						printf("%f\n",temp);
+						if(min>temp){
+							min=temp;
+							mini=j;
+						}
+					}
+				}
 			}else{
 				// mpi rcv to rank-(mxk)
 				// psakse sta akriana apo ta megala
 			}
 		}
 		//rdy
-		if( fabs( Q[1*(Nc/P)+i] - C[1*(Nq/P)+mini] ) > fabs( Q[1*(Nq/P)+i] - (m/mo) * (i+1) ) ){
+		if( fabs( Q[1*(Nc/P)+i] - C[1*(Nq/P)+mini] ) > fabs( Q[1*(Nq/P)+i] - mbh ) ){
 			// printf("Maybe nearest to %f\n",Q[3*(Nq/P)+i]+100);
 			// printf("check yyh %i =%d\n",i,((((int)Q[3*(Nq/P)+i])%10000)+100)/100);
 			if(((((int)Q[3*(Nq/P)+i])%10000)+100)/100<=(mo/m)){
 				// check sto kouti me Q[3*(Nq/P)+i]+100 sto C[3*(Nc/P)+j]
+				for(j=0;j<ic;j++){
+					if((Q[3*(Nq/P)+i]+100)==C[3*(Nc/P)+j]){
+						z=5;
+						temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+						printf("%f\n",temp);
+						if(min>temp){
+							min=temp;
+							mini=j;
+						}
+					}
+				}
 			}else{
 				// mpi rcv to rank+k
 				// psakse sta akriana apo ta mikra
 			}
 		}
-		if( fabs( Q[1*(Nc/P)+i] - C[1*(Nq/P)+mini] ) > fabs( Q[1*(Nq/P)+i] - (m/mo) * (i) ) ){
+		if( fabs( Q[1*(Nc/P)+i] - C[1*(Nq/P)+mini] ) > fabs( Q[1*(Nq/P)+i] - mbl ) ){
 			// printf("Maybe nearest to %f\n",Q[3*(Nq/P)+i]-100);
 			// printf("check yyl %i =%d\n",i,((((int)Q[3*(Nq/P)+i])%10000)-100)/100);
 			if(((((int)Q[3*(Nq/P)+i])%10000)-100)/100>=1){
 				// check sto kouti me Q[3*(Nq/P)+i]-100 sto C[3*(Nc/P)+j]
+				for(j=0;j<ic;j++){
+					if((Q[3*(Nq/P)+i]-100)==C[3*(Nc/P)+j]){
+						z=5;
+						temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+						printf("%f\n",temp);
+						if(min>temp){
+							min=temp;
+							mini=j;
+						}
+					}
+				}
 			}else{
 				// mpi rcv to rank-k
 				// psakse sta akriana apo ta megala
 			}
 		}
-		if( fabs( Q[2*(Nc/P)+i] - C[2*(Nq/P)+mini] ) > fabs( Q[2*(Nq/P)+i] - (k/ko) * (i+1) ) ){
+		if( fabs( Q[2*(Nc/P)+i] - C[2*(Nq/P)+mini] ) > fabs( Q[2*(Nq/P)+i] - kbh ) ){
 			// printf("Maybe nearest to %f\n",Q[3*5+i]+1);
 			// printf("check zzh %i =%d\n",i,((((int)Q[3*(Nq/P)+i])%100)+1));
 			if(((((int)Q[3*(Nq/P)+i])%100)+1)<=(k/ko)){
-
 				// check sto kouti me Q[3*5+i]+1 sto C[3*(Nc/P)+j]
+				for(j=0;j<ic;j++){
+					if((Q[3*(Nq/P)+i]+1)==C[3*(Nc/P)+j]){
+						z=5;
+						temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+						printf("%f\n",temp);
+						if(min>temp){
+							min=temp;
+							mini=j;
+						}
+					}
+				}
 			}else{
 				// mpi rcv to rank+1
 				// psakse sto idio kouti me to C[3*5+i]
 			}
 		}
-		if( fabs( Q[2*(Nc/P)+i] - C[2*(Nq/P)+mini] ) > fabs( Q[2*(Nq/P)+i] - (k/ko) * (i) ) ){
+		if( fabs( Q[2*(Nc/P)+i] - C[2*(Nq/P)+mini] ) > fabs( Q[2*(Nq/P)+i] - kbl ) ){
 			// printf("Maybe nearest to %f\n",Q[3*5+i]-1);
 			// printf("check zzl %i =%d\n",i,((((int)Q[3*(Nq/P)+i])%100)-1));
 			if(((((int)Q[3*(Nq/P)+i])%100)-1)>=1){
 				// check sto kouti me Q[3*5+i]-1 sto C[3*(Nc/P)+j]
+				for(j=0;j<ic;j++){
+					if((Q[3*(Nq/P)+i]-1)==C[3*(Nc/P)+j]){
+						z=5;
+						temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+						printf("%f\n",temp);
+						if(min>temp){
+							min=temp;
+							mini=j;
+						}
+					}
+				}
 			}else{
 				// mpi rcv to rank-1
 				// psakse sto idio kouti me to C[3*5+i]
@@ -416,39 +491,39 @@ void check_inc_C(){
 			A=0;
 		}
 	}
-	// for(s=ic;s<L;s++){
-	// 	d[0] =nbl +((double) rand()/RAND_MAX)*(nbh-nbl);
-	// 	d[1] =mbl +((double) rand()/RAND_MAX)*(mbh-mbl);
-	// 	d[2] =kbl +((double) rand()/RAND_MAX)*(kbh-kbl);
-	// 	for(a = nbl ; a < nbh ; a = a + (nbh-nbl)/n){
-	// 		if(d[0]<a){
-	// 			break;
-	// 		}
-	// 		A++;
-	// 	}
-	// 	A*=100;
-	// // Find y coordinate
-	// 	for(a = mbl ; a < mbh ; a = a + (mbh-mbl)/m){
-	// 		if(d[1]<a){
-	// 			break;
-	// 		}
-	// 		A++;
-	// 	}
-	// 	A*=100;
-	// // Find z coordinate
-	// 	for(a = kbl ; a < kbh ; a = a + (kbh-kbl)/k){
-	// 		if(d[2]<a){
-	// 			break;
-	// 		}
-	// 		A++;
-	// 	}
-	// 	C[0*L+ic]=d[0];
-	// 	C[1*L+ic]=d[1];
-	// 	C[2*L+ic]=d[2];
-	// 	C[3*L+ic]=A;
-	// 	ic++;
-	// 	A=0;
-	// }
+	for(s=ic;s<L;s++){
+		d[0] =nbl +((double) rand()/RAND_MAX)*(nbh-nbl);
+		d[1] =mbl +((double) rand()/RAND_MAX)*(mbh-mbl);
+		d[2] =kbl +((double) rand()/RAND_MAX)*(kbh-kbl);
+		for(a = nbl ; a < nbh ; a = a + (nbh-nbl)/n){
+			if(d[0]<a){
+				break;
+			}
+			A++;
+		}
+		A*=100;
+	// Find y coordinate
+		for(a = mbl ; a < mbh ; a = a + (mbh-mbl)/m){
+			if(d[1]<a){
+				break;
+			}
+			A++;
+		}
+		A*=100;
+	// Find z coordinate
+		for(a = kbl ; a < kbh ; a = a + (kbh-kbl)/k){
+			if(d[2]<a){
+				break;
+			}
+			A++;
+		}
+		C[0*L+ic]=d[0];
+		C[1*L+ic]=d[1];
+		C[2*L+ic]=d[2];
+		C[3*L+ic]=A;
+		ic++;
+		A=0;
+	}
 
 	// sleep(2*rank);
 	quicksort(C,0,ic-1,L);
@@ -522,39 +597,39 @@ void check_inc_Q(){
 			A=0;
 		}
 	}
-	// for(s=iq;s<L;s++){
-	// 	d[0] =nbl +((double) rand()/RAND_MAX)*(nbh-nbl);
-	// 	d[1] =mbl +((double) rand()/RAND_MAX)*(mbh-mbl);
-	// 	d[2] =kbl +((double) rand()/RAND_MAX)*(kbh-kbl);
-	// 	for(a = nbl ; a < nbh ; a = a + (nbh-nbl)/n){
-	// 		if(d[0]<a){
-	// 			break;
-	// 		}
-	// 		A++;
-	// 	}
-	// 	A*=100;
-	// // Find y coordinate
-	// 	for(a = mbl ; a < mbh ; a = a + (mbh-mbl)/m){
-	// 		if(d[1]<a){
-	// 			break;
-	// 		}
-	// 		A++;
-	// 	}
-	// 	A*=100;
-	// // Find z coordinate
-	// 	for(a = kbl ; a < kbh ; a = a + (kbh-kbl)/k){
-	// 		if(d[2]<a){
-	// 			break;
-	// 		}
-	// 		A++;
-	// 	}
-	// 	Q[0*L+iq]=d[0];
-	// 	Q[1*L+iq]=d[1];
-	// 	Q[2*L+iq]=d[2];
-	// 	Q[3*L+iq]=A;
-	// 	iq++;
-	// 	A=0;
-	// }
+	for(s=iq;s<L;s++){
+		d[0] =nbl +((double) rand()/RAND_MAX)*(nbh-nbl);
+		d[1] =mbl +((double) rand()/RAND_MAX)*(mbh-mbl);
+		d[2] =kbl +((double) rand()/RAND_MAX)*(kbh-kbl);
+		for(a = nbl ; a < nbh ; a = a + (nbh-nbl)/n){
+			if(d[0]<a){
+				break;
+			}
+			A++;
+		}
+		A*=100;
+	// Find y coordinate
+		for(a = mbl ; a < mbh ; a = a + (mbh-mbl)/m){
+			if(d[1]<a){
+				break;
+			}
+			A++;
+		}
+		A*=100;
+	// Find z coordinate
+		for(a = kbl ; a < kbh ; a = a + (kbh-kbl)/k){
+			if(d[2]<a){
+				break;
+			}
+			A++;
+		}
+		Q[0*L+iq]=d[0];
+		Q[1*L+iq]=d[1];
+		Q[2*L+iq]=d[2];
+		Q[3*L+iq]=A;
+		iq++;
+		A=0;
+	}
 	// sleep(2*rank);
 	quicksort(Q,0,iq-1,L);
 	
@@ -585,7 +660,7 @@ void make_grid(){
 // srand setup 
 	struct timeval time; 
 	gettimeofday(&time,NULL);
-	srand((time.tv_sec * 1000)*rank + (time.tv_usec / 1000)*rank);
+	srand((time.tv_sec * 1000)*(rank+1) + (time.tv_usec / 1000)*(rank+1));
 
 // Malloc tables
 	
