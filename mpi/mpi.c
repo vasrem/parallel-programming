@@ -155,6 +155,11 @@ int main(int argc, char **argv){
 	
 	if(rank==0){
 		// printf("Number of active processes is %d\n",numtasks);
+		printf("--------Info--------\n");
+		printf("# of processes: %d\n",P);
+		printf("size of C     : %d\n",Nc);
+		printf("size of Q     : %d\n",Nq);
+		printf("size of grid  : %d\n",gs);
 		int i=1;
 		double s1,s2,s3;
 		//Give right bounds
@@ -182,7 +187,7 @@ int main(int argc, char **argv){
 		nbh=buf[3];	// High X bound
 		mbh=buf[4];	// High Y bound
 		kbh=buf[5];	// High Z bound
-		printf("Process #%d\nnl=%f ml=%f kl=%f nh=%f mh=%f kh=%f\n",rank,nbl,mbl,kbl,nbh,mbh,kbh);
+		// printf("Process #%d\nnl=%f ml=%f kl=%f nh=%f mh=%f kh=%f\n",rank,nbl,mbl,kbl,nbh,mbh,kbh);
 		gettimeofday (&startwtime, NULL);
 		make_grid();
 		
@@ -258,27 +263,37 @@ int main(int argc, char **argv){
 			seq_time = (double)((endwtime.tv_usec - startwtime.tv_usec)/1.0e6
 				+ endwtime.tv_sec - startwtime.tv_sec);
 
-			printf("Make grid time : %f\n",seq_time);
+			printf("Grid creation time : %f\n",seq_time);
 		}
 
 		// Search
+		gettimeofday (&startwtime, NULL);
+		search_nn();
+		gettimeofday (&endwtime, NULL);
+		if(rank==1){
+			seq_time = (double)((endwtime.tv_usec - startwtime.tv_usec)/1.0e6
+				+ endwtime.tv_sec - startwtime.tv_sec);
 
-		// search_nn();
-
+			printf("Search nearest neighbor time : %f\n",seq_time);
+		}
 	}
 	
 	MPI_Finalize();
 
 }
 void search_nn(){
-	sleep(rank);
-	printf("Process #%d\n",rank);
+	// sleep(rank);
+	// printf("Process #%d\n",rank);
 	int i,j,s,z;
 	double temp;
 	int target;
 	double *Cxl,*Cyl,*Czl;
 	double *Cxh,*Cyh,*Czh;
-	MPI_Request reqs[12];
+	MPI_Request *reqs;
+	reqs = (MPI_Request *) malloc(12*sizeof(MPI_Request));
+	MPI_Status *stats;
+	stats = (MPI_Status *) malloc(6*sizeof(MPI_Status));
+
 	// Initialize the incoming tables
 	Cxl =(double *) malloc((Nc/P)*4*sizeof(double));
 	Cyl =(double *) malloc((Nc/P)*4*sizeof(double));
@@ -292,84 +307,87 @@ void search_nn(){
 	// xh send
 	target = rank + ( (ko/k) * (mo/m) );
 	if(target<numtasks){
-		printf("Sending xh to rank #%d\n",target);
-		MPI_Isend(&C[0],Nc/P,MPI_DOUBLE,target,target,MPI_COMM_WORLD,&reqs[0]);
+		// printf("Sending xh to rank #%d\n",target);
+		MPI_Isend(&C[0],Nc/P,MPI_DOUBLE,target,1+(10*rank),MPI_COMM_WORLD,&reqs[0]);
 	}
 
 	// xl send
 	target = rank - ( (ko/k) * (mo/m) );
 	if(target>0){
-		printf("Sending xl to rank #%d\n",target);
-		MPI_Isend(&C[0],Nc/P,MPI_DOUBLE,target,target,MPI_COMM_WORLD,&reqs[1]);
+		// printf("Sending xl to rank #%d\n",target);
+		MPI_Isend(&C[0],Nc/P,MPI_DOUBLE,target,2+(10*rank),MPI_COMM_WORLD,&reqs[1]);
 	}
 
 	// yh send
 	target = rank + (ko/k);
 	if(target<numtasks){
-		printf("Sending yh to rank #%d\n",target);
-		MPI_Isend(&C[0],Nc/P,MPI_DOUBLE,target,target,MPI_COMM_WORLD,&reqs[2]);
+		// printf("Sending yh to rank #%d\n",target);
+		MPI_Isend(&C[0],Nc/P,MPI_DOUBLE,target,3+(10*rank),MPI_COMM_WORLD,&reqs[2]);
 	}
 
 	// yl send
 	target = rank - (ko/k);
 	if(target>0){
-		printf("Sending yl to rank #%d\n",target);
-		MPI_Isend(&C[0],Nc/P,MPI_DOUBLE,target,target,MPI_COMM_WORLD,&reqs[3]);
+		// printf("Sending yl to rank #%d\n",target);
+		MPI_Isend(&C[0],Nc/P,MPI_DOUBLE,target,4+(10*rank),MPI_COMM_WORLD,&reqs[3]);
 	}
 
 	// zh send
 	target = rank + 1;
 	if(target<numtasks){
-		printf("Sending zh to rank #%d\n",target);
-		MPI_Isend(&C[0],Nc/P,MPI_DOUBLE,target,target,MPI_COMM_WORLD,&reqs[4]);
+		// printf("Sending zh to rank #%d\n",target);
+		MPI_Isend(&C[0],Nc/P,MPI_DOUBLE,target,5+(10*rank),MPI_COMM_WORLD,&reqs[4]);
 	}
 
 	// zl send
 	target = rank - 1;
 	if(target>0){
-		printf("Sending zl to rank #%d\n",target);
-		MPI_Isend(&C[0],Nc/P,MPI_DOUBLE,target,target,MPI_COMM_WORLD,&reqs[5]);
+		// printf("Sending zl to rank #%d\n",target);
+		MPI_Isend(&C[0],Nc/P,MPI_DOUBLE,target,6+(10*rank),MPI_COMM_WORLD,&reqs[5]);
 	}
 
-	// if there is zh
-	target = rank + 1;
-	if(target<numtasks){
-		MPI_Irecv(&Czh[0],Nc/P,MPI_DOUBLE,target,target,MPI_COMM_WORLD,&reqs[6]);
-	}
-
-	// if there is zl
-	target = rank - 1;
-	if(target>0){
-		MPI_Irecv(&Czl[0],Nc/P,MPI_DOUBLE,target,target,MPI_COMM_WORLD,&reqs[7]);
-	}
-
-	// if there is yh
-	target = rank + (ko/k);
-	if(target<numtasks){
-		MPI_Irecv(&Cyh[0],Nc/P,MPI_DOUBLE,target,target,MPI_COMM_WORLD,&reqs[8]);
-	}
-
-	// if there is yl
-	target = rank - (ko/k);
-	if(target>0){
-		MPI_Irecv(&Cyl[0],Nc/P,MPI_DOUBLE,target,target,MPI_COMM_WORLD,&reqs[9]);
-	}
 
 	// if there is xh
 	target = rank + ( (ko/k) * (mo/m) );
 	if(target<numtasks){
-		MPI_Irecv(&Cxh[0],Nc/P,MPI_DOUBLE,target,target,MPI_COMM_WORLD,&reqs[10]);
+		MPI_Irecv(&Cxh[0],Nc/P,MPI_DOUBLE,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[6]);
 	}
 
 	// if there is xl
 	target = rank - ( (ko/k) * (mo/m) );
 	if(target>0){
-		MPI_Irecv(&Cxl[0],Nc/P,MPI_DOUBLE,target,target,MPI_COMM_WORLD,&reqs[11]);
+		MPI_Irecv(&Cxl[0],Nc/P,MPI_DOUBLE,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[7]);
 	}
+
+	// if there is yh
+	target = rank + (ko/k);
+	if(target<numtasks){
+		MPI_Irecv(&Cyh[0],Nc/P,MPI_DOUBLE,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[8]);
+	}
+
+	// if there is yl
+	target = rank - (ko/k);
+	if(target>0){
+		MPI_Irecv(&Cyl[0],Nc/P,MPI_DOUBLE,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[9]);
+	}
+
+	// if there is zh
+	target = rank + 1;
+	if(target<numtasks){
+		MPI_Irecv(&Czh[0],Nc/P,MPI_DOUBLE,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[10]);
+	}
+
+	// if there is zl
+	target = rank - 1;
+	if(target>0){
+		MPI_Irecv(&Czl[0],Nc/P,MPI_DOUBLE,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[11]);
+	}
+
 
 	// min value and index.
 	double min=1;
 	int mini=0;
+	double min_n[3];
 	for(i=0;i<iq;i++){
 		// printf("Check for -> %f %f %f %f\n",Q[0*(Nq/P)+i],Q[1*(Nq/P)+i],Q[2*(Nq/P)+i],Q[3*(Nq/P)+i]);
 		for(j=0;j<ic;j++){
@@ -380,6 +398,9 @@ void search_nn(){
 				// printf("%f\n",temp);
 				if(min>temp){
 					min=temp;
+					min_n[0]=C[0*(Nc/P)+j];
+					min_n[1]=C[1*(Nc/P)+j];
+					min_n[2]=C[2*(Nc/P)+j];
 					mini=j;
 				}
 			}
@@ -411,13 +432,35 @@ void search_nn(){
 						// printf("%f\n",temp);
 						if(min>temp){
 							min=temp;
+							min_n[0]=C[0*(Nc/P)+j];
+							min_n[1]=C[1*(Nc/P)+j];
+							min_n[2]=C[2*(Nc/P)+j];
 							mini=j;
 						}
 					}
 				}
 			}else{
-				// mpi rcv to rank+(mxk) opou m kai k se posa koutia spaei i ka8e diastasi ka8e fora.
-				// psakse sta akriana apo ta mikra
+				target = rank + ( (ko/k) * (mo/m) );
+				if(target<numtasks){
+					// mpi rcv to rank+(mxk) opou m kai k se posa koutia spaei i ka8e diastasi ka8e fora.
+					// psakse sta akriana apo ta mikra
+					MPI_Wait(&reqs[6],&stats[0]);
+					// Go to the box with the same y z and x = 1
+					// target =( ( (int) (Q[3*(Nq/P)+i]) ) % 10000 ) + 10000;
+					for(j=0;j<ic;j++){
+						// if(target == Cxh[3*(Nc/P)+j]){
+							z=5;
+							temp=sqrt(pow(Cxh[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cxh[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cxh[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+							if(min>temp){
+								min=temp;
+								min_n[0]=Cxh[0*(Nc/P)+j];
+								min_n[1]=Cxh[1*(Nc/P)+j];
+								min_n[2]=Cxh[2*(Nc/P)+j];
+								mini=j;
+							}
+						// }
+					}
+				}
 			}
 		}
 		if( fabs( Q[0*(Nc/P)+i] - C[0*(Nq/P)+mini] ) > fabs( Q[0*(Nq/P)+i] - nbl ) ){
@@ -432,13 +475,34 @@ void search_nn(){
 						// printf("%f\n",temp);
 						if(min>temp){
 							min=temp;
+							min_n[0]=C[0*(Nc/P)+j];
+							min_n[1]=C[1*(Nc/P)+j];
+							min_n[2]=C[2*(Nc/P)+j];
 							mini=j;
 						}
 					}
 				}
 			}else{
-				// mpi rcv to rank-(mxk)
-				// psakse sta akriana apo ta megala
+				target = rank - ( (ko/k) * (mo/m) );
+				if(target>0){
+					// mpi rcv to rank-(mxk)
+					// psakse sta akriana apo ta megala
+
+					MPI_Wait(&reqs[7],&stats[1]);
+					for(j=0;j<ic;j++){
+						// if(target == Cxh[3*(Nc/P)+j]){
+							z=5;
+							temp=sqrt(pow(Cxl[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cxl[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cxl[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+							if(min>temp){
+								min=temp;
+								min_n[0]=Cxl[0*(Nc/P)+j];
+								min_n[1]=Cxl[1*(Nc/P)+j];
+								min_n[2]=Cxl[2*(Nc/P)+j];
+								mini=j;
+							}
+						// }
+					}
+				}
 			}
 		}
 		//rdy
@@ -454,13 +518,33 @@ void search_nn(){
 						// printf("%f\n",temp);
 						if(min>temp){
 							min=temp;
+							min_n[0]=C[0*(Nc/P)+j];
+							min_n[1]=C[1*(Nc/P)+j];
+							min_n[2]=C[2*(Nc/P)+j];
 							mini=j;
 						}
 					}
 				}
 			}else{
-				// mpi rcv to rank+k
-				// psakse sta akriana apo ta mikra
+				target = rank + (ko/k);
+				if(target<numtasks){
+					// mpi rcv to rank+k
+					// psakse sta akriana apo ta mikra
+					MPI_Wait(&reqs[8],&stats[2]);
+					for(j=0;j<ic;j++){
+						// if(target == Cxh[3*(Nc/P)+j]){
+							z=5;
+							temp=sqrt(pow(Cyh[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cyh[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cyh[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+							if(min>temp){
+								min=temp;
+								min_n[0]=Cyh[0*(Nc/P)+j];
+								min_n[1]=Cyh[1*(Nc/P)+j];
+								min_n[2]=Cyh[2*(Nc/P)+j];
+								mini=j;
+							}
+						// }
+					}
+				}
 			}
 		}
 		if( fabs( Q[1*(Nc/P)+i] - C[1*(Nq/P)+mini] ) > fabs( Q[1*(Nq/P)+i] - mbl ) ){
@@ -475,13 +559,33 @@ void search_nn(){
 						// printf("%f\n",temp);
 						if(min>temp){
 							min=temp;
+							min_n[0]=C[0*(Nc/P)+j];
+							min_n[1]=C[1*(Nc/P)+j];
+							min_n[2]=C[2*(Nc/P)+j];
 							mini=j;
 						}
 					}
 				}
 			}else{
-				// mpi rcv to rank-k
-				// psakse sta akriana apo ta megala
+				target = rank - (ko/k);
+				if(target>0){
+					// mpi rcv to rank-k
+					// psakse sta akriana apo ta megala
+					MPI_Wait(&reqs[9],&stats[3]);
+					for(j=0;j<ic;j++){
+						// if(target == Cxh[3*(Nc/P)+j]){
+							z=5;
+							temp=sqrt(pow(Cyl[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cyl[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cyl[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+							if(min>temp){
+								min=temp;
+								min_n[0]=Cyl[0*(Nc/P)+j];
+								min_n[1]=Cyl[1*(Nc/P)+j];
+								min_n[2]=Cyl[2*(Nc/P)+j];
+								mini=j;
+							}
+						// }
+					}
+				}
 			}
 		}
 		if( fabs( Q[2*(Nc/P)+i] - C[2*(Nq/P)+mini] ) > fabs( Q[2*(Nq/P)+i] - kbh ) ){
@@ -496,13 +600,33 @@ void search_nn(){
 						// printf("%f\n",temp);
 						if(min>temp){
 							min=temp;
+							min_n[0]=C[0*(Nc/P)+j];
+							min_n[1]=C[1*(Nc/P)+j];
+							min_n[2]=C[2*(Nc/P)+j];
 							mini=j;
 						}
 					}
 				}
 			}else{
-				// mpi rcv to rank+1
-				// psakse sto idio kouti me to C[3*5+i]
+				target = rank + 1;
+				if(target<numtasks){
+					// mpi rcv to rank+1
+					// psakse sto idio kouti me to C[3*5+i]
+					MPI_Wait(&reqs[10],&stats[4]);
+					for(j=0;j<ic;j++){
+						// if(target == Cxh[3*(Nc/P)+j]){
+							z=5;
+							temp=sqrt(pow(Czh[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Czh[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Czh[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+							if(min>temp){
+								min=temp;
+								min_n[0]=Czh[0*(Nc/P)+j];
+								min_n[1]=Czh[1*(Nc/P)+j];
+								min_n[2]=Czh[2*(Nc/P)+j];
+								mini=j;
+							}
+						// }
+					}
+				}
 			}
 		}
 		if( fabs( Q[2*(Nc/P)+i] - C[2*(Nq/P)+mini] ) > fabs( Q[2*(Nq/P)+i] - kbl ) ){
@@ -517,21 +641,42 @@ void search_nn(){
 						// printf("%f\n",temp);
 						if(min>temp){
 							min=temp;
+							min_n[0]=C[0*(Nc/P)+j];
+							min_n[1]=C[1*(Nc/P)+j];
+							min_n[2]=C[2*(Nc/P)+j];
 							mini=j;
 						}
 					}
 				}
 			}else{
-				// mpi rcv to rank-1
-				// psakse sto idio kouti me to C[3*5+i]
+				target = rank - 1;
+				if(target>0){
+					// mpi rcv to rank-1
+					// psakse sto idio kouti me to C[3*5+i]
+					MPI_Wait(&reqs[11],&stats[5]);
+					for(j=0;j<ic;j++){
+						// if(target == Cxh[3*(Nc/P)+j]){
+							z=5;
+							temp=sqrt(pow(Czl[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Czl[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Czl[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+							if(min>temp){
+								min=temp;
+								min_n[0]=Czl[0*(Nc/P)+j];
+								min_n[1]=Czl[1*(Nc/P)+j];
+								min_n[2]=Czl[2*(Nc/P)+j];
+								mini=j;
+							}
+						// }
+					}
+				}
 			}
 		}
-		if(z==5){
-			// printf("Kontinoteros %d -> %f %f %f %f\n",mini,C[0*(Nq/P)+mini],C[1*(Nq/P)+mini],C[2*(Nq/P)+mini],C[3*(Nq/P)+mini]);
-			min=1;
-			mini=0;
-			z=0;
-		}
+		// printf("min=%f %f %f",min_n[0],min_n[1],min_n[2]);
+		// if(z==5){
+		// 	// printf("Kontinoteros %d -> %f %f %f %f\n",mini,C[0*(Nq/P)+mini],C[1*(Nq/P)+mini],C[2*(Nq/P)+mini],C[3*(Nq/P)+mini]);
+		// 	min=1;
+		// 	mini=0;
+		// 	z=0;
+		// }
 	}
 }
 
