@@ -105,7 +105,12 @@ int main(int argc, char **argv){
 	Ci=(double *) malloc((Nc/P)*3*(numtasks-1)*sizeof(double ));
 	Qi=(double *) malloc((Nq/P)*3*(numtasks-1)*sizeof(double ));
 
-
+	for(i=0;i<(Nc/P)*3*(numtasks-1);i++){
+		Ci[i]=0;
+	}
+	for(i=0;i<(Nc/P)*3*(numtasks-1);i++){
+		Qi[i]=0;
+	}
 
 	temp = log( gs ) / log(2);
 	for(i=0;i< temp ; i++){
@@ -534,9 +539,9 @@ void search_nn(){
 void check_inc_C(){
 	int s,z=0;
 	int A=0;
-	double a;
+	double a,vima;
 	L = (Nc / P);
-	sleep(rank);
+	// sleep(2*rank);
 	double *d;
 	d =(double *) malloc(3*sizeof(double));
 	struct timeval time; 
@@ -549,6 +554,8 @@ void check_inc_C(){
 		}
 		// printf("%d %d %d\n",z*L+s,(z+1)*L+s,(z+2)*L+s);
 		// Jump to the next subtable when zeros
+		// printf("rank %d checking ic=%d s=%d\n",rank,ic,s);
+		// printf("Ci[%d][%d]=%f [%d]=%f [%d]=%f\n",s,z,Ci[z*L+s],z+1,Ci[(z+1)*L+s],z+2,Ci[(z+2)*L+s]);
 		if((Ci[z*L+s]==0 && Ci[(z+1)*L+s]==0 && Ci[(z+2)*L+s]==0) || s==L){
 			z+=3;
 			if(z<(numtasks-1)*3){
@@ -566,6 +573,7 @@ void check_inc_C(){
 			C[2*L+ic]=0;
 			C[3*L+ic]=0;
 	// Find x coordinate
+			vima = nbh-nbl;
 			for(a = nbl ; a < nbh ; a = a + (nbh-nbl)/n){
 				if(Ci[z*L+s]<a){
 					break;
@@ -574,7 +582,7 @@ void check_inc_C(){
 			}
 			A*=100;
 	// Find y coordinate
-			for(a = mbl ; a < mbh ; a = a + (mbh-nbl)/m){
+			for(a = mbl ; a < mbh ; a = a + (mbh-mbl)/m){
 				if(Ci[(z+1)*L+s]<a){
 					break;
 				}
@@ -680,7 +688,7 @@ void check_inc_Q(){
 			}
 			A*=100;
 	// Find y coordinate
-			for(a = mbl ; a < mbh ; a = a + (mbh-nbl)/m){
+			for(a = mbl ; a < mbh ; a = a + (mbh-mbl)/m){
 				if(Qi[(z+1)*L+s]<a){
 					break;
 				}
