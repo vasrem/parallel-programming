@@ -242,7 +242,7 @@ int main(int argc, char **argv){
 			MPI_Barrier(mc);
 			check_inc_Q();
 			MPI_Barrier(mc);
-			
+			// printf("#%d ic=%d\n",rank,ic);
 			free(Ci);
 			free(Qi);
 			free(Co);
@@ -269,6 +269,7 @@ int main(int argc, char **argv){
 		// Search
 		gettimeofday (&startwtime, NULL);
 		search_nn();
+		MPI_Barrier(mc);
 		gettimeofday (&endwtime, NULL);
 		if(rank==1){
 			seq_time = (double)((endwtime.tv_usec - startwtime.tv_usec)/1.0e6
@@ -284,7 +285,7 @@ int main(int argc, char **argv){
 void search_nn(){
 	// sleep(rank);
 	// printf("Process #%d\n",rank);
-	int i,j,s,z;
+	int i,j,s,z,c;
 	double temp;
 	int target;
 	double *Cxl,*Cyl,*Czl;
@@ -293,7 +294,7 @@ void search_nn(){
 	reqs = (MPI_Request *) malloc(12*sizeof(MPI_Request));
 	MPI_Status *stats;
 	stats = (MPI_Status *) malloc(6*sizeof(MPI_Status));
-
+	c=0;
 	// Initialize the incoming tables
 	Cxl =(double *) malloc((Nc/P)*4*sizeof(double));
 	Cyl =(double *) malloc((Nc/P)*4*sizeof(double));
@@ -390,10 +391,18 @@ void search_nn(){
 	double min_n[3];
 	for(i=0;i<iq;i++){
 		// printf("Check for -> %f %f %f %f\n",Q[0*(Nq/P)+i],Q[1*(Nq/P)+i],Q[2*(Nq/P)+i],Q[3*(Nq/P)+i]);
+		// avoid to check to some boxes.
+		if(i>0){
+			if(Q[3*(Nq/P)+i]==Q[3*(Nq/P)+i-1]){
+				// printf("mphka\n");
+				c-=z;
+			}
+			z=-1;
+		}
 		for(j=0;j<ic;j++){
+			z++;
 			// Check if its in the same box.
 			if(Q[3*(Nq/P)+i]==C[3*(Nc/P)+j]){
-				z=5;
 				temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
 				// printf("%f\n",temp);
 				if(min>temp){
@@ -404,10 +413,17 @@ void search_nn(){
 					mini=j;
 				}
 			}
+			else{
+				c=j;
+				break;
+			}
 			// else{
 			// 	break;
 			// }
 			// the min distance with the distance of Q[{0,1,2}*5+i] from the bounds.
+		}
+		if(j==ic){
+			z--;
 		}
 		// printf("Bound nbh:%f %f is %d\n",fabs( Q[0*(Nc/P)+i] - C[0*(Nq/P)+mini] ),fabs( Q[0*(Nq/P)+i] - nbh ),fabs( Q[0*(Nc/P)+i] - C[0*(Nq/P)+mini] )>fabs( Q[0*(Nq/P)+i] - nbh ) );
 		// printf("Bound nbl:%f %f is %d\n",fabs( Q[0*(Nc/P)+i] - C[0*(Nq/P)+mini] ),fabs( Q[0*(Nq/P)+i] - nbl ),fabs( Q[0*(Nc/P)+i] - C[0*(Nq/P)+mini] )>fabs( Q[0*(Nq/P)+i] - nbl ));
@@ -427,7 +443,6 @@ void search_nn(){
 				// check sto kouti me Q[3*(Nq/P)+i]+10000 sto C[3*5+j]
 				for(j=0;j<ic;j++){
 					if((Q[3*(Nq/P)+i]+10000)==C[3*(Nc/P)+j]){
-						z=5;
 						temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
 						// printf("%f\n",temp);
 						if(min>temp){
@@ -447,9 +462,8 @@ void search_nn(){
 					MPI_Wait(&reqs[6],&stats[0]);
 					// Go to the box with the same y z and x = 1
 					// target =( ( (int) (Q[3*(Nq/P)+i]) ) % 10000 ) + 10000;
-					for(j=0;j<ic;j++){
+					for(j=0;j<(ic/(n*m*k));j++){
 						// if(target == Cxh[3*(Nc/P)+j]){
-							z=5;
 							temp=sqrt(pow(Cxh[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cxh[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cxh[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
 							if(min>temp){
 								min=temp;
@@ -470,7 +484,6 @@ void search_nn(){
 				// check sto kouti me Q[3*(Nq/P)+i]-10000 sto C[3*(Nc/P)+j] 
 				for(j=0;j<ic;j++){
 					if((Q[3*(Nq/P)+i]-10000)==C[3*(Nc/P)+j]){
-						z=5;
 						temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
 						// printf("%f\n",temp);
 						if(min>temp){
@@ -489,9 +502,8 @@ void search_nn(){
 					// psakse sta akriana apo ta megala
 
 					MPI_Wait(&reqs[7],&stats[1]);
-					for(j=0;j<ic;j++){
+					for(j=(ic/(n*m*k))-1;j>=ic-(ic/(n*m*k));j--){
 						// if(target == Cxh[3*(Nc/P)+j]){
-							z=5;
 							temp=sqrt(pow(Cxl[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cxl[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cxl[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
 							if(min>temp){
 								min=temp;
@@ -513,7 +525,6 @@ void search_nn(){
 				// check sto kouti me Q[3*(Nq/P)+i]+100 sto C[3*(Nc/P)+j]
 				for(j=0;j<ic;j++){
 					if((Q[3*(Nq/P)+i]+100)==C[3*(Nc/P)+j]){
-						z=5;
 						temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
 						// printf("%f\n",temp);
 						if(min>temp){
@@ -531,9 +542,8 @@ void search_nn(){
 					// mpi rcv to rank+k
 					// psakse sta akriana apo ta mikra
 					MPI_Wait(&reqs[8],&stats[2]);
-					for(j=0;j<ic;j++){
+					for(j=0;j<(ic/(n*m*k));j++){
 						// if(target == Cxh[3*(Nc/P)+j]){
-							z=5;
 							temp=sqrt(pow(Cyh[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cyh[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cyh[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
 							if(min>temp){
 								min=temp;
@@ -554,7 +564,6 @@ void search_nn(){
 				// check sto kouti me Q[3*(Nq/P)+i]-100 sto C[3*(Nc/P)+j]
 				for(j=0;j<ic;j++){
 					if((Q[3*(Nq/P)+i]-100)==C[3*(Nc/P)+j]){
-						z=5;
 						temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
 						// printf("%f\n",temp);
 						if(min>temp){
@@ -572,9 +581,8 @@ void search_nn(){
 					// mpi rcv to rank-k
 					// psakse sta akriana apo ta megala
 					MPI_Wait(&reqs[9],&stats[3]);
-					for(j=0;j<ic;j++){
+					for(j=(ic/(n*m*k))-1;j>=ic-(ic/(n*m*k));j--){
 						// if(target == Cxh[3*(Nc/P)+j]){
-							z=5;
 							temp=sqrt(pow(Cyl[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cyl[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cyl[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
 							if(min>temp){
 								min=temp;
@@ -595,7 +603,6 @@ void search_nn(){
 				// check sto kouti me Q[3*5+i]+1 sto C[3*(Nc/P)+j]
 				for(j=0;j<ic;j++){
 					if((Q[3*(Nq/P)+i]+1)==C[3*(Nc/P)+j]){
-						z=5;
 						temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
 						// printf("%f\n",temp);
 						if(min>temp){
@@ -613,9 +620,8 @@ void search_nn(){
 					// mpi rcv to rank+1
 					// psakse sto idio kouti me to C[3*5+i]
 					MPI_Wait(&reqs[10],&stats[4]);
-					for(j=0;j<ic;j++){
+					for(j=0;j<(ic/(n*m*k));j++){
 						// if(target == Cxh[3*(Nc/P)+j]){
-							z=5;
 							temp=sqrt(pow(Czh[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Czh[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Czh[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
 							if(min>temp){
 								min=temp;
@@ -636,7 +642,6 @@ void search_nn(){
 				// check sto kouti me Q[3*5+i]-1 sto C[3*(Nc/P)+j]
 				for(j=0;j<ic;j++){
 					if((Q[3*(Nq/P)+i]-1)==C[3*(Nc/P)+j]){
-						z=5;
 						temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
 						// printf("%f\n",temp);
 						if(min>temp){
@@ -654,9 +659,8 @@ void search_nn(){
 					// mpi rcv to rank-1
 					// psakse sto idio kouti me to C[3*5+i]
 					MPI_Wait(&reqs[11],&stats[5]);
-					for(j=0;j<ic;j++){
+					for(j=(ic/(n*m*k))-1;j>=ic-(ic/(n*m*k));j--){
 						// if(target == Cxh[3*(Nc/P)+j]){
-							z=5;
 							temp=sqrt(pow(Czl[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Czl[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Czl[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
 							if(min>temp){
 								min=temp;
@@ -670,6 +674,8 @@ void search_nn(){
 				}
 			}
 		}
+		min=1;
+		mini=0;
 		// printf("min=%f %f %f",min_n[0],min_n[1],min_n[2]);
 		// if(z==5){
 		// 	// printf("Kontinoteros %d -> %f %f %f %f\n",mini,C[0*(Nq/P)+mini],C[1*(Nq/P)+mini],C[2*(Nq/P)+mini],C[3*(Nq/P)+mini]);
