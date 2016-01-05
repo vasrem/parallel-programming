@@ -42,7 +42,7 @@ float kbh=0;	// High Z bound
 int numtasks, rank; 
 
 struct timeval startwtime, endwtime;
-double seq_time;
+double grid_time,search_time;
 
 void make_grid();
 void check_inc_C();
@@ -156,10 +156,10 @@ int main(int argc, char **argv){
 	if(rank==0){
 		// printf("Number of active processes is %d\n",numtasks);
 		printf("--------Info--------\n");
-		printf("# of processes: %d\n",P);
-		printf("size of C     : %d\n",Nc);
-		printf("size of Q     : %d\n",Nq);
-		printf("size of grid  : %d\n",gs);
+		printf("# of processes: %d\t-> %d\n",atoi(argv[4]),P);
+		printf("size of C     : %d\t-> %d\n",atoi(argv[1]),Nc);
+		printf("size of Q     : %d\t-> %d\n",atoi(argv[2]),Nq);
+		printf("size of grid  : %d\t-> %d\n",atoi(argv[3]),gs);
 		int i=1;
 		double s1,s2,s3;
 		//Give right bounds
@@ -260,10 +260,10 @@ int main(int argc, char **argv){
 		}
 		gettimeofday (&endwtime, NULL);
 		if(rank==1){
-			seq_time = (double)((endwtime.tv_usec - startwtime.tv_usec)/1.0e6
+			grid_time = (double)((endwtime.tv_usec - startwtime.tv_usec)/1.0e6
 				+ endwtime.tv_sec - startwtime.tv_sec);
 
-			printf("Grid creation time : %f\n",seq_time);
+			printf("Grid creation time : %f\n",grid_time);
 		}
 
 		// Search
@@ -272,10 +272,25 @@ int main(int argc, char **argv){
 		MPI_Barrier(mc);
 		gettimeofday (&endwtime, NULL);
 		if(rank==1){
-			seq_time = (double)((endwtime.tv_usec - startwtime.tv_usec)/1.0e6
+			search_time = (double)((endwtime.tv_usec - startwtime.tv_usec)/1.0e6
 				+ endwtime.tv_sec - startwtime.tv_sec);
 
-			printf("Search nearest neighbor time : %f\n",seq_time);
+			printf("Search nearest neighbor time : %f\n",search_time);
+
+			FILE *f = fopen("times.txt", "a");
+			if (f == NULL)
+			{
+				printf("Error opening file!\n");
+				exit(1);
+			}
+			fprintf(f,"--------Info--------\n");
+			fprintf(f,"# of processes: %d\t-> %d\n",atoi(argv[4]),P);
+			fprintf(f,"size of C     : %d\t-> %d\n",atoi(argv[1]),Nc);
+			fprintf(f,"size of Q     : %d\t-> %d\n",atoi(argv[2]),Nq);
+			fprintf(f,"size of grid  : %d\t-> %d\n",atoi(argv[3]),gs);
+			fprintf(f,"Grid creation time : %f\n",grid_time);
+			fprintf(f,"Search nearest neighbor time : %f\n",search_time);
+			fclose(f);
 		}
 	}
 	
@@ -384,7 +399,7 @@ void search_nn(){
 		MPI_Irecv(&Czl[0],Nc/P,MPI_DOUBLE,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[11]);
 	}
 
-
+	// printf("ic=%d n*m*k=%f ic/gs=%f\n",ic,n*m*k,(ic/(n*m*k)));
 	// min value and index.
 	double min=1;
 	int mini=0;
@@ -431,13 +446,14 @@ void search_nn(){
 		// printf("Bound mbl:%f %f is %d\n",fabs( Q[1*(Nc/P)+i] - C[1*(Nq/P)+mini] ),fabs( Q[1*(Nq/P)+i] - mbl ),fabs( Q[1*(Nc/P)+i] - C[1*(Nq/P)+mini] )>fabs( Q[1*(Nq/P)+i] - mbl ) );
 		// printf("Bound kbh:%f %f is %d\n",fabs( Q[2*(Nc/P)+i] - C[2*(Nq/P)+mini] ),fabs( Q[2*(Nq/P)+i] - kbh ),fabs( Q[2*(Nc/P)+i] - C[2*(Nq/P)+mini] )>fabs( Q[2*(Nq/P)+i] - kbh ) );
 		// printf("Bound kbl:%f %f is %d\n",fabs( Q[2*(Nc/P)+i] - C[2*(Nq/P)+mini] ),fabs( Q[2*(Nq/P)+i] - kbl ),fabs( Q[2*(Nc/P)+i] - C[2*(Nq/P)+mini] )>fabs( Q[2*(Nq/P)+i] - kbl ) );
-		if( fabs( Q[0*(Nc/P)+i] - C[0*(Nq/P)+mini] ) > fabs( Q[0*(Nq/P)+i] - nbh ) ){
+		if( (fabs( Q[0*(Nq/P)+i] - C[0*(Nc/P)+mini] ) > fabs( Q[0*(Nq/P)+i] - nbh )) && nbh<1 ){
 			// na koitaw an uparxei auto to kouti se auto to process
 			// ---- an uparxei tote vriskw to kainourgio min sugkrinontas to Q[0*5+i] me ola ta C tou allou koutiou 
 			// kai sigkrinw me to min p vrika parapanw[ line :104 ]
 			// ---- an den uparxei tote 8a prepei na zitaw apo to process p einai dipla m, analoga me ta bounds, to C tou kai na sigkrinw to Q[0*5+i]
 			// me to C tou swstou koutiou tou allou process.
 			// printf("check xxh %i =%d\n",i,(int)(Q[3*(Nq/P)+i]+10000)/10000);
+			temp=0;
 			if((int)(Q[3*(Nq/P)+i]+10000)/10000<=(no/n)){
 				// printf("Maybe nearest to %f\n",Q[3*(Nq/P)+i]+10000);
 				// check sto kouti me Q[3*(Nq/P)+i]+10000 sto C[3*5+j]
@@ -451,6 +467,10 @@ void search_nn(){
 							min_n[1]=C[1*(Nc/P)+j];
 							min_n[2]=C[2*(Nc/P)+j];
 							mini=j;
+						}
+					}else{
+						if(temp!=0){
+							break;
 						}
 					}
 				}
@@ -477,9 +497,10 @@ void search_nn(){
 				}
 			}
 		}
-		if( fabs( Q[0*(Nc/P)+i] - C[0*(Nq/P)+mini] ) > fabs( Q[0*(Nq/P)+i] - nbl ) ){
+		if( ( fabs( Q[0*(Nq/P)+i] - C[0*(Nc/P)+mini] ) > fabs( Q[0*(Nq/P)+i] - nbl ) ) && nbl>0 ){
 			// printf("check xxl %i =%d\n",i,(int)(Q[3*(Nq/P)+i]-10000)/10000);
 				// printf("Maybe nearest to %f\n",Q[3*(Nq/P)+i]-10000);
+			temp=0;
 			if((int)(Q[3*(Nq/P)+i]-10000)/10000>=1){
 				// check sto kouti me Q[3*(Nq/P)+i]-10000 sto C[3*(Nc/P)+j] 
 				for(j=0;j<ic;j++){
@@ -493,6 +514,10 @@ void search_nn(){
 							min_n[2]=C[2*(Nc/P)+j];
 							mini=j;
 						}
+					}else{
+						if(temp!=0){
+							break;
+						}
 					}
 				}
 			}else{
@@ -502,7 +527,7 @@ void search_nn(){
 					// psakse sta akriana apo ta megala
 
 					MPI_Wait(&reqs[7],&stats[1]);
-					for(j=(ic/(n*m*k))-1;j>=ic-(ic/(n*m*k));j--){
+					for(j=ic-1;j>=ic-(ic/(n*m*k));j--){
 						// if(target == Cxh[3*(Nc/P)+j]){
 							temp=sqrt(pow(Cxl[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cxl[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cxl[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
 							if(min>temp){
@@ -518,9 +543,10 @@ void search_nn(){
 			}
 		}
 		//rdy
-		if( fabs( Q[1*(Nc/P)+i] - C[1*(Nq/P)+mini] ) > fabs( Q[1*(Nq/P)+i] - mbh ) ){
+		if( ( fabs( Q[1*(Nq/P)+i] - C[1*(Nc/P)+mini] ) > fabs( Q[1*(Nq/P)+i] - mbh )) && mbh<1 ){
 			// printf("Maybe nearest to %f\n",Q[3*(Nq/P)+i]+100);
 			// printf("check yyh %i =%d\n",i,((((int)Q[3*(Nq/P)+i])%10000)+100)/100);
+			temp=0;
 			if(((((int)Q[3*(Nq/P)+i])%10000)+100)/100<=(mo/m)){
 				// check sto kouti me Q[3*(Nq/P)+i]+100 sto C[3*(Nc/P)+j]
 				for(j=0;j<ic;j++){
@@ -533,6 +559,10 @@ void search_nn(){
 							min_n[1]=C[1*(Nc/P)+j];
 							min_n[2]=C[2*(Nc/P)+j];
 							mini=j;
+						}
+					}else{
+						if(temp!=0){
+							break;
 						}
 					}
 				}
@@ -557,9 +587,10 @@ void search_nn(){
 				}
 			}
 		}
-		if( fabs( Q[1*(Nc/P)+i] - C[1*(Nq/P)+mini] ) > fabs( Q[1*(Nq/P)+i] - mbl ) ){
+		if( (fabs( Q[1*(Nq/P)+i] - C[1*(Nc/P)+mini] ) > fabs( Q[1*(Nq/P)+i] - mbl ) ) && mbl>0 ){
 			// printf("Maybe nearest to %f\n",Q[3*(Nq/P)+i]-100);
 			// printf("check yyl %i =%d\n",i,((((int)Q[3*(Nq/P)+i])%10000)-100)/100);
+			temp=0;
 			if(((((int)Q[3*(Nq/P)+i])%10000)-100)/100>=1){
 				// check sto kouti me Q[3*(Nq/P)+i]-100 sto C[3*(Nc/P)+j]
 				for(j=0;j<ic;j++){
@@ -573,6 +604,10 @@ void search_nn(){
 							min_n[2]=C[2*(Nc/P)+j];
 							mini=j;
 						}
+					}else{
+						if(temp!=0){
+							break;
+						}
 					}
 				}
 			}else{
@@ -581,7 +616,7 @@ void search_nn(){
 					// mpi rcv to rank-k
 					// psakse sta akriana apo ta megala
 					MPI_Wait(&reqs[9],&stats[3]);
-					for(j=(ic/(n*m*k))-1;j>=ic-(ic/(n*m*k));j--){
+					for(j=ic-1;j>=ic-(ic/(n*m*k));j--){
 						// if(target == Cxh[3*(Nc/P)+j]){
 							temp=sqrt(pow(Cyl[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cyl[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cyl[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
 							if(min>temp){
@@ -596,9 +631,10 @@ void search_nn(){
 				}
 			}
 		}
-		if( fabs( Q[2*(Nc/P)+i] - C[2*(Nq/P)+mini] ) > fabs( Q[2*(Nq/P)+i] - kbh ) ){
+		if( (fabs( Q[2*(Nq/P)+i] - C[2*(Nc/P)+mini] ) > fabs( Q[2*(Nq/P)+i] - kbh )) && kbh<1 ){
 			// printf("Maybe nearest to %f\n",Q[3*5+i]+1);
 			// printf("check zzh %i =%d\n",i,((((int)Q[3*(Nq/P)+i])%100)+1));
+			temp=0;
 			if(((((int)Q[3*(Nq/P)+i])%100)+1)<=(k/ko)){
 				// check sto kouti me Q[3*5+i]+1 sto C[3*(Nc/P)+j]
 				for(j=0;j<ic;j++){
@@ -611,6 +647,10 @@ void search_nn(){
 							min_n[1]=C[1*(Nc/P)+j];
 							min_n[2]=C[2*(Nc/P)+j];
 							mini=j;
+						}
+					}else{
+						if(temp!=0){
+							break;
 						}
 					}
 				}
@@ -635,9 +675,10 @@ void search_nn(){
 				}
 			}
 		}
-		if( fabs( Q[2*(Nc/P)+i] - C[2*(Nq/P)+mini] ) > fabs( Q[2*(Nq/P)+i] - kbl ) ){
+		if( (fabs( Q[2*(Nq/P)+i] - C[2*(Nc/P)+mini] ) > fabs( Q[2*(Nq/P)+i] - kbl ) ) && kbl>0 ){
 			// printf("Maybe nearest to %f\n",Q[3*5+i]-1);
 			// printf("check zzl %i =%d\n",i,((((int)Q[3*(Nq/P)+i])%100)-1));
+			temp=0;
 			if(((((int)Q[3*(Nq/P)+i])%100)-1)>=1){
 				// check sto kouti me Q[3*5+i]-1 sto C[3*(Nc/P)+j]
 				for(j=0;j<ic;j++){
@@ -651,6 +692,10 @@ void search_nn(){
 							min_n[2]=C[2*(Nc/P)+j];
 							mini=j;
 						}
+					}else{
+						if(temp!=0){
+							break;
+						}
 					}
 				}
 			}else{
@@ -659,7 +704,7 @@ void search_nn(){
 					// mpi rcv to rank-1
 					// psakse sto idio kouti me to C[3*5+i]
 					MPI_Wait(&reqs[11],&stats[5]);
-					for(j=(ic/(n*m*k))-1;j>=ic-(ic/(n*m*k));j--){
+					for(j=ic-1;j>=ic-(ic/(n*m*k));j--){
 						// if(target == Cxh[3*(Nc/P)+j]){
 							temp=sqrt(pow(Czl[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Czl[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Czl[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
 							if(min>temp){
