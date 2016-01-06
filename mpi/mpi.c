@@ -486,7 +486,7 @@ void search_nn(){
 					MPI_Wait(&reqs[6],&stats[0]);
 					// Go to the box with the same y z and x = 1
 					// target =( ( (int) (Q[3*(Nq/P)+i]) ) % 10000 ) + 10000;
-					for(j=0;j<(ic/(n*m*k));j++){
+					for(j=0;j<(ic/(n*m*k)+20);j++){
 						// if(target == Cxh[3*(Nc/P)+j]){
 							temp=sqrt(pow(Cxh[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cxh[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cxh[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
 							if(min>temp){
@@ -531,7 +531,7 @@ void search_nn(){
 					// psakse sta akriana apo ta megala
 
 					MPI_Wait(&reqs[7],&stats[1]);
-					for(j=ic-1;j>=ic-(ic/(n*m*k));j--){
+					for(j=ic-1;j>=ic-(ic/(n*m*k))-20;j--){
 						// if(target == Cxh[3*(Nc/P)+j]){
 							temp=sqrt(pow(Cxl[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cxl[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cxl[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
 							if(min>temp){
@@ -576,7 +576,7 @@ void search_nn(){
 					// mpi rcv to rank+k
 					// psakse sta akriana apo ta mikra
 					MPI_Wait(&reqs[8],&stats[2]);
-					for(j=0;j<(ic/(n*m*k));j++){
+					for(j=0;j<(ic/(n*m*k))+20;j++){
 						// if(target == Cxh[3*(Nc/P)+j]){
 							temp=sqrt(pow(Cyh[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cyh[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cyh[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
 							if(min>temp){
@@ -620,7 +620,7 @@ void search_nn(){
 					// mpi rcv to rank-k
 					// psakse sta akriana apo ta megala
 					MPI_Wait(&reqs[9],&stats[3]);
-					for(j=ic-1;j>=ic-(ic/(n*m*k));j--){
+					for(j=ic-1;j>=ic-(ic/(n*m*k))-20;j--){
 						// if(target == Cxh[3*(Nc/P)+j]){
 							temp=sqrt(pow(Cyl[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cyl[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cyl[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
 							if(min>temp){
@@ -664,7 +664,7 @@ void search_nn(){
 					// mpi rcv to rank+1
 					// psakse sto idio kouti me to C[3*5+i]
 					MPI_Wait(&reqs[10],&stats[4]);
-					for(j=0;j<(ic/(n*m*k));j++){
+					for(j=0;j<(ic/(n*m*k))+20;j++){
 						// if(target == Cxh[3*(Nc/P)+j]){
 							temp=sqrt(pow(Czh[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Czh[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Czh[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
 							if(min>temp){
@@ -708,7 +708,7 @@ void search_nn(){
 					// mpi rcv to rank-1
 					// psakse sto idio kouti me to C[3*5+i]
 					MPI_Wait(&reqs[11],&stats[5]);
-					for(j=ic-1;j>=ic-(ic/(n*m*k));j--){
+					for(j=ic-1;j>=ic-(ic/(n*m*k))-20;j--){
 						// if(target == Cxh[3*(Nc/P)+j]){
 							temp=sqrt(pow(Czl[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Czl[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Czl[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
 							if(min>temp){
