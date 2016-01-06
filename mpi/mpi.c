@@ -179,6 +179,7 @@ int main(int argc, char **argv){
 			}
 		}
 
+
 	}else{
 		MPI_Recv (&buf[0],6,MPI_FLOAT,0,rank,MPI_COMM_WORLD,&stats[rank-1]);
 		nbl=buf[0];	// Low X bound
@@ -309,7 +310,6 @@ void search_nn(){
 	reqs = (MPI_Request *) malloc(12*sizeof(MPI_Request));
 	MPI_Status *stats;
 	stats = (MPI_Status *) malloc(6*sizeof(MPI_Status));
-	c=0;
 	// Initialize the incoming tables
 	Cxl =(double *) malloc((Nc/P)*4*sizeof(double));
 	Cyl =(double *) malloc((Nc/P)*4*sizeof(double));
@@ -404,6 +404,8 @@ void search_nn(){
 	double min=1;
 	int mini=0;
 	double min_n[3];
+	c=0;
+	z=-1;
 	for(i=0;i<iq;i++){
 		// printf("Check for -> %f %f %f %f\n",Q[0*(Nq/P)+i],Q[1*(Nq/P)+i],Q[2*(Nq/P)+i],Q[3*(Nq/P)+i]);
 		// avoid to check to some boxes.
@@ -412,9 +414,11 @@ void search_nn(){
 				// printf("mphka\n");
 				c-=z;
 			}
+			// printf("%d\t",z);
 			z=-1;
 		}
-		for(j=0;j<ic;j++){
+		// printf("z=%d c=%d\n",z,c);
+		for(j=c;j<ic;j++){
 			z++;
 			// Check if its in the same box.
 			if(Q[3*(Nq/P)+i]==C[3*(Nc/P)+j]){
@@ -454,7 +458,7 @@ void search_nn(){
 			// me to C tou swstou koutiou tou allou process.
 			// printf("check xxh %i =%d\n",i,(int)(Q[3*(Nq/P)+i]+10000)/10000);
 			temp=0;
-			if((int)(Q[3*(Nq/P)+i]+10000)/10000<=(no/n)){
+			if((int)(Q[3*(Nq/P)+i]+10000)/10000<=(n)){
 				// printf("Maybe nearest to %f\n",Q[3*(Nq/P)+i]+10000);
 				// check sto kouti me Q[3*(Nq/P)+i]+10000 sto C[3*5+j]
 				for(j=0;j<ic;j++){
@@ -547,7 +551,7 @@ void search_nn(){
 			// printf("Maybe nearest to %f\n",Q[3*(Nq/P)+i]+100);
 			// printf("check yyh %i =%d\n",i,((((int)Q[3*(Nq/P)+i])%10000)+100)/100);
 			temp=0;
-			if(((((int)Q[3*(Nq/P)+i])%10000)+100)/100<=(mo/m)){
+			if(((((int)Q[3*(Nq/P)+i])%10000)+100)/100<=(m)){
 				// check sto kouti me Q[3*(Nq/P)+i]+100 sto C[3*(Nc/P)+j]
 				for(j=0;j<ic;j++){
 					if((Q[3*(Nq/P)+i]+100)==C[3*(Nc/P)+j]){
@@ -635,7 +639,7 @@ void search_nn(){
 			// printf("Maybe nearest to %f\n",Q[3*5+i]+1);
 			// printf("check zzh %i =%d\n",i,((((int)Q[3*(Nq/P)+i])%100)+1));
 			temp=0;
-			if(((((int)Q[3*(Nq/P)+i])%100)+1)<=(k/ko)){
+			if(((((int)Q[3*(Nq/P)+i])%100)+1)<=(k)){
 				// check sto kouti me Q[3*5+i]+1 sto C[3*(Nc/P)+j]
 				for(j=0;j<ic;j++){
 					if((Q[3*(Nq/P)+i]+1)==C[3*(Nc/P)+j]){
@@ -729,6 +733,7 @@ void search_nn(){
 		// 	z=0;
 		// }
 	}
+
 }
 
 
