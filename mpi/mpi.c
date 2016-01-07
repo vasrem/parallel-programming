@@ -153,6 +153,9 @@ int main(int argc, char **argv){
 	
 	if(rank==0){
 		// printf("Number of active processes is %d\n",numtasks);
+		// printf("%d %d %d %d\n",Nc,Nq,gs,P);
+		// printf("n=%f m=%f k=%f\n",n,m,k);
+		// printf("no=%f mo=%f ko=%f\n",no,mo,ko);
 		printf("--------Info--------\n");
 		printf("# of processes: %d\t-> %d\n",atoi(argv[4]),P);
 		printf("size of C     : %d\t-> %d\n",atoi(argv[1]),Nc);
@@ -264,7 +267,10 @@ void search_nn(){
 	Czh =(double *) malloc((Nc/P)*4*sizeof(double));
 
 	// MPI Send Recieves
-
+	int done[6];
+	for(i=0;i<6;i++){
+		done[i]=0;
+	}
 	// xh send
 	target = rank + ( (ko/k) * (mo/m) );
 	if(target<numtasks){
@@ -311,36 +317,42 @@ void search_nn(){
 	// if there is xh
 	target = rank + ( (ko/k) * (mo/m) );
 	if(target<numtasks){
+		done[0]=1;
 		MPI_Irecv(&Cxh[0],Nc/P,MPI_DOUBLE,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[6]);
 	}
 
 	// if there is xl
 	target = rank - ( (ko/k) * (mo/m) );
 	if(target>0){
+		done[1]=1;
 		MPI_Irecv(&Cxl[0],Nc/P,MPI_DOUBLE,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[7]);
 	}
 
 	// if there is yh
 	target = rank + (ko/k);
 	if(target<numtasks){
+		done[2]=1;
 		MPI_Irecv(&Cyh[0],Nc/P,MPI_DOUBLE,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[8]);
 	}
 
 	// if there is yl
 	target = rank - (ko/k);
 	if(target>0){
+		done[3]=1;
 		MPI_Irecv(&Cyl[0],Nc/P,MPI_DOUBLE,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[9]);
 	}
 
 	// if there is zh
 	target = rank + 1;
 	if(target<numtasks){
+		done[4]=1;
 		MPI_Irecv(&Czh[0],Nc/P,MPI_DOUBLE,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[10]);
 	}
 
 	// if there is zl
 	target = rank - 1;
 	if(target>0){
+		done[5]=1;
 		MPI_Irecv(&Czl[0],Nc/P,MPI_DOUBLE,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[11]);
 	}
 
@@ -385,221 +397,398 @@ void search_nn(){
 		xx=(int)Q[3*(Nq/P)+i]/10000;
 		yy=(int)Q[3*(Nq/P)+i]%10000/100;
 		zz=(int)Q[3*(Nq/P)+i]%100;
-		// printf("%f x=%d y=%d z=%d\n",Q[3*(Nq/P)+i],xx,yy,zz);
-		if( (fabs( Q[0*(Nq/P)+i] - C[0*(Nc/P)+mini] ) > fabs( Q[0*(Nq/P)+i] - nbh )) && nbh<1 ){
+		printf("%f x=%d y=%d z=%d\n",Q[3*(Nq/P)+i],xx,yy,zz);
+		// Prepei na allaksw to nbh me nbl + [(nbh-nbl/n) * xx]
+		//&& (nbl + ((nbh-nbl)/n)*xx)<1
+		if( (fabs( Q[0*(Nq/P)+i] - C[0*(Nc/P)+mini] ) > fabs( Q[0*(Nq/P)+i] - (nbl + ((nbh-nbl)/n)*xx ) ) ) ){
 			// Check if the box is in the same process
 			temp=0;
-			if((int)(Q[3*(Nq/P)+i]+10000)/10000<=(n)){
+			if(xx+1<=n){
+
+				target=10000*(xx+1)+yy*100+zz;
+				if(rank==1){
+					printf("checking box=%d\n",target);
+				}
 				for(j=0;j<ic;j++){
-					if((Q[3*(Nq/P)+i]+10000)==C[3*(Nc/P)+j]){
+
+					if(target==C[3*(Nc/P)+j]){
+
 						temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+
 						if(min>temp){
+
 							min=temp;
 							min_n[0]=C[0*(Nc/P)+j];
 							min_n[1]=C[1*(Nc/P)+j];
 							min_n[2]=C[2*(Nc/P)+j];
-						}
-					}else{
-						if(temp!=0){
-							break;
+
+						}else{
+
+							if(temp!=0){
+								break;
+							}
 						}
 					}
 				}
-			}else{
-				// Check the recieved boxes
+			}else if(nbh<1){
 				target = rank + ( (ko/k) * (mo/m) );
+				if(rank==1){
+					printf("checking neighbor xh process #%d\n",target);
+				}
 				if(target<numtasks){
+
 					MPI_Wait(&reqs[6],&stats[0]);
-					// Check first ic/(n*m*k)+20 data of Cxh
-					for(j=0;j<(ic/(n*m*k)+20);j++){
-							temp=sqrt(pow(Cxh[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cxh[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cxh[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
-							if(min>temp){
+
+					for(j=0;j<ic;j++){
+
+						temp=sqrt(pow(Cxh[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cxh[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cxh[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+						if(min>temp){
 								min=temp;
 								min_n[0]=Cxh[0*(Nc/P)+j];
 								min_n[1]=Cxh[1*(Nc/P)+j];
 								min_n[2]=Cxh[2*(Nc/P)+j];
-							}
+						}
 					}
 				}
 			}
 		}
-		if( ( fabs( Q[0*(Nq/P)+i] - C[0*(Nc/P)+mini] ) > fabs( Q[0*(Nq/P)+i] - nbl ) ) && nbl>0 ){
+		if( (fabs( Q[0*(Nq/P)+i] - C[0*(Nc/P)+mini] ) > fabs( Q[0*(Nq/P)+i] - (nbl + ((nbh-nbl)/n)*(xx-1) ) ) ) ){
+
 			temp=0;
-			if((int)(Q[3*(Nq/P)+i]-10000)/10000>=1){
+			if(xx-1>=1){
+
+				target=10000*(xx-1)+yy*100+zz;
+				if(rank==1){
+					printf("checking box=%d\n",target);
+				}
 				for(j=0;j<ic;j++){
-					if((Q[3*(Nq/P)+i]-10000)==C[3*(Nc/P)+j]){
+
+					if(target==C[3*(Nc/P)+j]){
+
 						temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+
 						if(min>temp){
+
 							min=temp;
 							min_n[0]=C[0*(Nc/P)+j];
 							min_n[1]=C[1*(Nc/P)+j];
 							min_n[2]=C[2*(Nc/P)+j];
-						}
-					}else{
-						if(temp!=0){
-							break;
+
+						}else{
+							if(temp!=0){
+								break;
+							}
 						}
 					}
 				}
-			}else{
+			}else if(nbl>0){
 				target = rank - ( (ko/k) * (mo/m) );
+				if(rank==1){
+					printf("checking neighbor xl process #%d\n",target);
+				}
 				if(target>0){
-					// Check last ic/(n*m*k)+20 data of Cxl
+
 					MPI_Wait(&reqs[7],&stats[1]);
-					for(j=ic-1;j>=ic-(ic/(n*m*k))-20;j--){
-							temp=sqrt(pow(Cxl[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cxl[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cxl[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
-							if(min>temp){
+
+					for(j=0;j<ic;j++){
+
+						temp=sqrt(pow(Cxl[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cxl[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cxl[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+						if(min>temp){
 								min=temp;
 								min_n[0]=Cxl[0*(Nc/P)+j];
 								min_n[1]=Cxl[1*(Nc/P)+j];
 								min_n[2]=Cxl[2*(Nc/P)+j];
-							}
+						}
 					}
 				}
 			}
 		}
-		if( ( fabs( Q[1*(Nq/P)+i] - C[1*(Nc/P)+mini] ) > fabs( Q[1*(Nq/P)+i] - mbh )) && mbh<1 ){
+		if( (fabs( Q[1*(Nq/P)+i] - C[1*(Nc/P)+mini] ) > fabs( Q[1*(Nq/P)+i] - (mbl + ((mbh-mbl)/m)*yy ) ) ) ){
 			temp=0;
-			if(((((int)Q[3*(Nq/P)+i])%10000)+100)/100<=(m)){
+			if(yy+1<=n){
+
+				target=10000*xx+(yy+1)*100+zz;
+				if(rank==1){
+					printf("checking box=%d\n",target);
+				}
 				for(j=0;j<ic;j++){
-					if((Q[3*(Nq/P)+i]+100)==C[3*(Nc/P)+j]){
+
+					if(target==C[3*(Nc/P)+j]){
+
 						temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+
 						if(min>temp){
+
 							min=temp;
 							min_n[0]=C[0*(Nc/P)+j];
 							min_n[1]=C[1*(Nc/P)+j];
 							min_n[2]=C[2*(Nc/P)+j];
-						}
-					}else{
-						if(temp!=0){
-							break;
+
+						}else{
+
+							if(temp!=0){
+								break;
+							}
 						}
 					}
 				}
-			}else{
+			}else if(mbh<1){
 				target = rank + (ko/k);
+				if(rank==1){
+					printf("checking neighbor yh process #%d\n",target);
+				}
 				if(target<numtasks){
-					// Check first ic/(n*m*k)+20 data of Cyh
+
 					MPI_Wait(&reqs[8],&stats[2]);
-					for(j=0;j<(ic/(n*m*k))+20;j++){
-							temp=sqrt(pow(Cyh[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cyh[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cyh[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
-							if(min>temp){
+
+					for(j=0;j<ic;j++){
+
+						temp=sqrt(pow(Cyh[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cyh[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cyh[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+						if(min>temp){
 								min=temp;
 								min_n[0]=Cyh[0*(Nc/P)+j];
 								min_n[1]=Cyh[1*(Nc/P)+j];
 								min_n[2]=Cyh[2*(Nc/P)+j];
-							}
+						}
 					}
 				}
 			}
 		}
-		if( (fabs( Q[1*(Nq/P)+i] - C[1*(Nc/P)+mini] ) > fabs( Q[1*(Nq/P)+i] - mbl ) ) && mbl>0 ){
+		if( (fabs( Q[1*(Nq/P)+i] - C[1*(Nc/P)+mini] ) > fabs( Q[1*(Nq/P)+i] - (mbl + ((mbh-mbl)/m)*(yy-1) ) ) ) ){
 			temp=0;
-			if(((((int)Q[3*(Nq/P)+i])%10000)-100)/100>=1){
+			if(yy-1>=1){
+
+				target=10000*xx+(yy-1)*100+zz;
+				if(rank==1){
+					printf("checking box=%d\n",target);
+				}
 				for(j=0;j<ic;j++){
-					if((Q[3*(Nq/P)+i]-100)==C[3*(Nc/P)+j]){
+
+					if(target==C[3*(Nc/P)+j]){
+
 						temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+
 						if(min>temp){
+
 							min=temp;
 							min_n[0]=C[0*(Nc/P)+j];
 							min_n[1]=C[1*(Nc/P)+j];
 							min_n[2]=C[2*(Nc/P)+j];
-						}
-					}else{
-						if(temp!=0){
-							break;
+
+						}else{
+							if(temp!=0){
+								break;
+							}
 						}
 					}
 				}
-			}else{
+			}else if(mbl>0){
 				target = rank - (ko/k);
+				if(rank==1){
+					printf("checking neighbor yl process #%d\n",target);
+				}
 				if(target>0){
-					// Check last ic/(n*m*k)+20 data of Cyl
+
 					MPI_Wait(&reqs[9],&stats[3]);
-					for(j=ic-1;j>=ic-(ic/(n*m*k))-20;j--){
-							temp=sqrt(pow(Cyl[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cyl[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cyl[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
-							if(min>temp){
+
+					for(j=0;j<ic;j++){
+
+						temp=sqrt(pow(Cyl[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cyl[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cyl[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+						if(min>temp){
 								min=temp;
 								min_n[0]=Cyl[0*(Nc/P)+j];
 								min_n[1]=Cyl[1*(Nc/P)+j];
 								min_n[2]=Cyl[2*(Nc/P)+j];
-							}
+						}
 					}
 				}
 			}
 		}
-		if( (fabs( Q[2*(Nq/P)+i] - C[2*(Nc/P)+mini] ) > fabs( Q[2*(Nq/P)+i] - kbh )) && kbh<1 ){
+		if( (fabs( Q[2*(Nq/P)+i] - C[2*(Nc/P)+mini] ) > fabs( Q[2*(Nq/P)+i] - (kbl + ((kbh-kbl)/k)*zz ) ) ) ){
 			temp=0;
-			if(((((int)Q[3*(Nq/P)+i])%100)+1)<=(k)){
+			if(zz+1<=n){
+
+				target=10000*xx+yy*100+zz+1;
+				if(rank==1){
+					printf("checking box=%d\n",target);
+				}
 				for(j=0;j<ic;j++){
-					if((Q[3*(Nq/P)+i]+1)==C[3*(Nc/P)+j]){
+
+					if(target==C[3*(Nc/P)+j]){
+
 						temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+
 						if(min>temp){
+
 							min=temp;
 							min_n[0]=C[0*(Nc/P)+j];
 							min_n[1]=C[1*(Nc/P)+j];
 							min_n[2]=C[2*(Nc/P)+j];
-						}
-					}else{
-						if(temp!=0){
-							break;
+
+						}else{
+
+							if(temp!=0){
+								break;
+							}
 						}
 					}
 				}
-			}else{
+			}else if(kbh<1){
 				target = rank + 1;
+				if(rank==1){
+					printf("checking neighbor zh process #%d\n",target);
+				}
 				if(target<numtasks){
-					// Check first ic/(n*m*k)+20 data of Czh
+
 					MPI_Wait(&reqs[10],&stats[4]);
-					for(j=0;j<(ic/(n*m*k))+20;j++){
-							temp=sqrt(pow(Czh[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Czh[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Czh[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
-							if(min>temp){
+
+					for(j=0;j<ic;j++){
+
+						temp=sqrt(pow(Czh[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Czh[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Czh[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+						if(min>temp){
 								min=temp;
 								min_n[0]=Czh[0*(Nc/P)+j];
 								min_n[1]=Czh[1*(Nc/P)+j];
 								min_n[2]=Czh[2*(Nc/P)+j];
-							}
+						}
 					}
 				}
 			}
 		}
-		if( (fabs( Q[2*(Nq/P)+i] - C[2*(Nc/P)+mini] ) > fabs( Q[2*(Nq/P)+i] - kbl ) ) && kbl>0 ){
+		if( (fabs( Q[2*(Nq/P)+i] - C[2*(Nc/P)+mini] ) > fabs( Q[2*(Nq/P)+i] - (kbl + ((kbh-kbl)/k)*(zz-1) ) ) ) ){
 			temp=0;
-			if(((((int)Q[3*(Nq/P)+i])%100)-1)>=1){
+			if(zz-1>=1){
+
+				target=10000*xx+yy*100+zz-1;
+				if(rank==1){
+					printf("checking box=%d\n",target);
+				}
 				for(j=0;j<ic;j++){
-					if((Q[3*(Nq/P)+i]-1)==C[3*(Nc/P)+j]){
+
+					if(target==C[3*(Nc/P)+j]){
+
 						temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+
 						if(min>temp){
+
 							min=temp;
 							min_n[0]=C[0*(Nc/P)+j];
 							min_n[1]=C[1*(Nc/P)+j];
 							min_n[2]=C[2*(Nc/P)+j];
-						}
-					}else{
-						if(temp!=0){
-							break;
+
+						}else{
+							if(temp!=0){
+								break;
+							}
 						}
 					}
 				}
-			}else{
+			}else if(kbl>0){
 				target = rank - 1;
+				if(rank==1){
+					printf("checking neighbor zl process #%d\n",target);
+				}
 				if(target>0){
-					// Check last ic/(n*m*k)+20 data of Czl
+
 					MPI_Wait(&reqs[11],&stats[5]);
-					for(j=ic-1;j>=ic-(ic/(n*m*k))-20;j--){
-							temp=sqrt(pow(Czl[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Czl[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Czl[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
-							if(min>temp){
+
+					for(j=0;j<ic;j++){
+
+						temp=sqrt(pow(Czl[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Czl[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Czl[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+						if(min>temp){
 								min=temp;
 								min_n[0]=Czl[0*(Nc/P)+j];
 								min_n[1]=Czl[1*(Nc/P)+j];
 								min_n[2]=Czl[2*(Nc/P)+j];
-							}
+						}
 					}
 				}
 			}
 		}
 		min=1;
 		mini=0;
+		double test_min=1;
+		double test[3];
+
+		for(j=0;j<ic;j++){
+			if(Q[3*(Nq/P)+i]==C[3*(Nc/P)+j]){
+				temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+				if(temp<test_min){
+					test_min=temp;
+					test[0]=C[0*(Nc/P)+j];
+					test[1]=C[1*(Nc/P)+j];
+					test[2]=C[2*(Nc/P)+j];
+				}
+				if(done[0]){
+					MPI_Wait(&reqs[6],&stats[0]);
+						temp=sqrt(pow(Cxh[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cxh[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cxh[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+						if(temp<test_min){
+								test_min=temp;
+								test[0]=Cxh[0*(Nc/P)+j];
+								test[1]=Cxh[1*(Nc/P)+j];
+								test[2]=Cxh[2*(Nc/P)+j];
+						}
+				}
+				if(done[1]){
+					MPI_Wait(&reqs[7],&stats[1]);
+						temp=sqrt(pow(Cxl[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cxl[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cxl[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+						if(temp<test_min){
+								test_min=temp;
+								test[0]=Cxl[0*(Nc/P)+j];
+								test[1]=Cxl[1*(Nc/P)+j];
+								test[2]=Cxl[2*(Nc/P)+j];
+						}
+				}
+				if(done[2]){
+					MPI_Wait(&reqs[8],&stats[2]);
+						temp=sqrt(pow(Cyh[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cyh[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cyh[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+						if(temp<test_min){
+								test_min=temp;
+								test[0]=Cyh[0*(Nc/P)+j];
+								test[1]=Cyh[1*(Nc/P)+j];
+								test[2]=Cyh[2*(Nc/P)+j];
+						}
+				}
+				if(done[3]){
+					MPI_Wait(&reqs[9],&stats[3]);
+						temp=sqrt(pow(Cyl[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cyl[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cyl[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+						if(temp<test_min){
+								test_min=temp;
+								test[0]=Cyl[0*(Nc/P)+j];
+								test[1]=Cyl[1*(Nc/P)+j];
+								test[2]=Cyl[2*(Nc/P)+j];
+						}
+				}
+				if(done[4]){
+					MPI_Wait(&reqs[10],&stats[4]);
+						temp=sqrt(pow(Czh[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Czh[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Czh[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+						if(temp<test_min){
+								test_min=temp;
+								test[0]=Czh[0*(Nc/P)+j];
+								test[1]=Czh[1*(Nc/P)+j];
+								test[2]=Czh[2*(Nc/P)+j];
+						}
+				}
+				if(done[5]){
+					MPI_Wait(&reqs[11],&stats[5]);
+						temp=sqrt(pow(Czl[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Czl[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Czl[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+						if(temp<test_min){
+								test_min=temp;
+								test[0]=Czl[0*(Nc/P)+j];
+								test[1]=Czl[1*(Nc/P)+j];
+								test[2]=Czl[2*(Nc/P)+j];
+						}
+				}
+			}
+		}
+
+		if(min_n[0]!=test[0] || min_n[1]!=test[1] || min_n[2]!=test[2]){
+			if(rank==1){
+				printf("fack");
+				exit(1);
+			}
+		}
+
 	}
 
 }
@@ -608,7 +797,7 @@ void search_nn(){
 void check_inc_C(){
 	int s,z=0;
 	int A=0;
-	double a,vima;
+	double a;
 	L = (Nc / P);
 	// sleep(2*rank);
 	double *d;
@@ -639,7 +828,6 @@ void check_inc_C(){
 			C[2*L+ic]=0;
 			C[3*L+ic]=0;
 	// Find x coordinate
-			vima = nbh-nbl;
 			for(a = nbl ; a < nbh ; a = a + (nbh-nbl)/n){
 				if(Ci[z*L+s]<a){
 					break;
