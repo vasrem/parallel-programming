@@ -348,6 +348,9 @@ void search_nn(){
 	double min=1;
 	int mini=0;
 	double min_n[3];
+	int xx;	//x box
+	int yy;	//y box
+	int zz;	//z box
 	c=0;
 	z=-1;
 	for(i=0;i<iq;i++){
@@ -379,6 +382,10 @@ void search_nn(){
 		if(j==ic){
 			z--;
 		}
+		xx=(int)Q[3*(Nq/P)+i]/10000;
+		yy=(int)Q[3*(Nq/P)+i]%10000/100;
+		zz=(int)Q[3*(Nq/P)+i]%100;
+		// printf("%f x=%d y=%d z=%d\n",Q[3*(Nq/P)+i],xx,yy,zz);
 		if( (fabs( Q[0*(Nq/P)+i] - C[0*(Nc/P)+mini] ) > fabs( Q[0*(Nq/P)+i] - nbh )) && nbh<1 ){
 			// Check if the box is in the same process
 			temp=0;
