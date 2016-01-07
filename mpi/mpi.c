@@ -267,10 +267,7 @@ void search_nn(){
 	Czh =(double *) malloc((Nc/P)*4*sizeof(double));
 
 	// MPI Send Recieves
-	int done[6];
-	for(i=0;i<6;i++){
-		done[i]=0;
-	}
+	
 	// xh send
 	target = rank + ( (ko/k) * (mo/m) );
 	if(target<numtasks){
@@ -317,42 +314,42 @@ void search_nn(){
 	// if there is xh
 	target = rank + ( (ko/k) * (mo/m) );
 	if(target<numtasks){
-		done[0]=1;
+
 		MPI_Irecv(&Cxh[0],Nc/P,MPI_DOUBLE,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[6]);
 	}
 
 	// if there is xl
 	target = rank - ( (ko/k) * (mo/m) );
 	if(target>0){
-		done[1]=1;
+
 		MPI_Irecv(&Cxl[0],Nc/P,MPI_DOUBLE,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[7]);
 	}
 
 	// if there is yh
 	target = rank + (ko/k);
 	if(target<numtasks){
-		done[2]=1;
+
 		MPI_Irecv(&Cyh[0],Nc/P,MPI_DOUBLE,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[8]);
 	}
 
 	// if there is yl
 	target = rank - (ko/k);
 	if(target>0){
-		done[3]=1;
+
 		MPI_Irecv(&Cyl[0],Nc/P,MPI_DOUBLE,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[9]);
 	}
 
 	// if there is zh
 	target = rank + 1;
 	if(target<numtasks){
-		done[4]=1;
+
 		MPI_Irecv(&Czh[0],Nc/P,MPI_DOUBLE,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[10]);
 	}
 
 	// if there is zl
 	target = rank - 1;
 	if(target>0){
-		done[5]=1;
+
 		MPI_Irecv(&Czl[0],Nc/P,MPI_DOUBLE,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[11]);
 	}
 
@@ -707,87 +704,7 @@ void search_nn(){
 		}
 		min=1;
 		mini=0;
-		double test_min=1;
-		double test[3];
-
-		for(j=0;j<ic;j++){
-			if(Q[3*(Nq/P)+i]==C[3*(Nc/P)+j]){
-				temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
-				if(temp<test_min){
-					test_min=temp;
-					test[0]=C[0*(Nc/P)+j];
-					test[1]=C[1*(Nc/P)+j];
-					test[2]=C[2*(Nc/P)+j];
-				}
-				if(done[0]){
-					MPI_Wait(&reqs[6],&stats[0]);
-						temp=sqrt(pow(Cxh[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cxh[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cxh[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
-						if(temp<test_min){
-								test_min=temp;
-								test[0]=Cxh[0*(Nc/P)+j];
-								test[1]=Cxh[1*(Nc/P)+j];
-								test[2]=Cxh[2*(Nc/P)+j];
-						}
-				}
-				if(done[1]){
-					MPI_Wait(&reqs[7],&stats[1]);
-						temp=sqrt(pow(Cxl[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cxl[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cxl[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
-						if(temp<test_min){
-								test_min=temp;
-								test[0]=Cxl[0*(Nc/P)+j];
-								test[1]=Cxl[1*(Nc/P)+j];
-								test[2]=Cxl[2*(Nc/P)+j];
-						}
-				}
-				if(done[2]){
-					MPI_Wait(&reqs[8],&stats[2]);
-						temp=sqrt(pow(Cyh[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cyh[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cyh[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
-						if(temp<test_min){
-								test_min=temp;
-								test[0]=Cyh[0*(Nc/P)+j];
-								test[1]=Cyh[1*(Nc/P)+j];
-								test[2]=Cyh[2*(Nc/P)+j];
-						}
-				}
-				if(done[3]){
-					MPI_Wait(&reqs[9],&stats[3]);
-						temp=sqrt(pow(Cyl[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cyl[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cyl[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
-						if(temp<test_min){
-								test_min=temp;
-								test[0]=Cyl[0*(Nc/P)+j];
-								test[1]=Cyl[1*(Nc/P)+j];
-								test[2]=Cyl[2*(Nc/P)+j];
-						}
-				}
-				if(done[4]){
-					MPI_Wait(&reqs[10],&stats[4]);
-						temp=sqrt(pow(Czh[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Czh[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Czh[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
-						if(temp<test_min){
-								test_min=temp;
-								test[0]=Czh[0*(Nc/P)+j];
-								test[1]=Czh[1*(Nc/P)+j];
-								test[2]=Czh[2*(Nc/P)+j];
-						}
-				}
-				if(done[5]){
-					MPI_Wait(&reqs[11],&stats[5]);
-						temp=sqrt(pow(Czl[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Czl[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Czl[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
-						if(temp<test_min){
-								test_min=temp;
-								test[0]=Czl[0*(Nc/P)+j];
-								test[1]=Czl[1*(Nc/P)+j];
-								test[2]=Czl[2*(Nc/P)+j];
-						}
-				}
-			}
-		}
-
-		if(min_n[0]!=test[0] || min_n[1]!=test[1] || min_n[2]!=test[2]){
-			if(rank==1){
-				printf("fack");
-				exit(1);
-			}
-		}
+		
 
 	}
 
