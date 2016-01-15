@@ -52,6 +52,7 @@ void check_inc_Q();
 void print_table(double *,int,int,int);
 void quicksort(double *,int,int,int);
 void search_nn();
+void search_serial();
 
 
 int main(int argc, char **argv){
@@ -220,7 +221,12 @@ int main(int argc, char **argv){
 		// Search
 
 		gettimeofday (&startwtime, NULL);
-		search_nn();
+		if(numtasks==2){
+			search_serial();
+		}else{
+			search_nn();
+		}
+		
 		MPI_Barrier(mc);
 		gettimeofday (&endwtime, NULL);
 		if(rank==1){
@@ -243,6 +249,27 @@ int main(int argc, char **argv){
 	MPI_Finalize();
 
 }
+
+void search_serial(){
+	double min=1;
+	int mini=-1;
+	double min_n[3];
+	double temp;
+	int i,j;
+	for(i=0;i<iq;i++){
+		for(j=0;j<ic;j++){
+			temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+			if(min>temp){
+				min=temp;
+				min_n[0]=C[0*(Nc/P)+j];
+				min_n[1]=C[1*(Nc/P)+j];
+				min_n[2]=C[2*(Nc/P)+j];
+				mini=j;
+			}
+		}
+	}
+}
+
 void search_nn(){
 
 	int i,j,s,z,c;
