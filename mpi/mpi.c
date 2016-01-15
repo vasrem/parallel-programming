@@ -235,13 +235,7 @@ int main(int argc, char **argv){
 				printf("Error opening file!\n");
 				exit(1);
 			}
-			fprintf(f,"--------Info--------\n");
-			fprintf(f,"# of processes: %d\t-> %d\n",atoi(argv[4]),P);
-			fprintf(f,"size of C     : %d\t-> %d\n",atoi(argv[1]),Nc);
-			fprintf(f,"size of Q     : %d\t-> %d\n",atoi(argv[2]),Nq);
-			fprintf(f,"size of grid  : %d\t-> %d\n",atoi(argv[3]),gs);
-			fprintf(f,"Grid creation time : %f\n",grid_time);
-			fprintf(f,"Search nearest neighbor time : %f\n",search_time);
+			fprintf(f,"%d\t-\t%d\t-\t%d\t->\t%f\t%f\n",atoi(argv[1]),atoi(argv[3]),P,grid_time,search_time);
 			fclose(f);
 		}
 	}
@@ -387,13 +381,7 @@ void search_nn(){
 	double min=1;
 	int mini=-1;
 	double min_n[3];
-	// if(rank==v){
-	// 	printf("C Table\n");
-	// 	print_table(C,ic,4,Nc/P);
-	// 	printf("Q Table\n");
-	// 	print_table(Q,iq,4,Nq/P);
-	// 	printf("\n");
-	// }
+	
 	for(i=0;i<iq;i++){
 		temp=0;
 		// Checking my box
@@ -622,234 +610,13 @@ void search_nn(){
 
 			}
 		}
-		if(rank==v){
-			// printf("Distance same box from %f %f %f mini=%d: %f\n",min_n[0],min_n[1],min_n[2],mini,min);
-		}
-
-		if(rank==v){
-			// printf("Bound distance is:\n");
-			// printf("From XH: %f\n", fabs( Q[0*(Nq/P)+i] - ( nbl + ( (nbh-nbl)/n ) * xx ) )  );
-			// printf("From XL: %f\n", fabs( Q[0*(Nq/P)+i] - ( nbl + ( (nbh-nbl)/n ) * ( xx - 1 ) ) )  );
-			// printf("From YH: %f\n", fabs( Q[0*(Nq/P)+i] - ( mbl + ( (mbh-mbl)/m ) *  yy ) ) );
-			// printf("From YL: %f\n", fabs( Q[0*(Nq/P)+i] - ( mbl + ( (mbh-mbl)/m ) *  ( yy - 1 ) ) )  );
-			// printf("From ZH: %f\n", fabs( Q[0*(Nq/P)+i] - ( kbl + ( (kbh-kbl)/k ) *  zz ) ) );
-			// printf("From ZL: %f\n", fabs( Q[0*(Nq/P)+i] - ( kbl + ( (kbh-kbl)/k ) *  ( zz - 1 ) ) )  );
-		}
-
-		// Checking nearby boxes
-
-		// Check for xx+1 yy zz 	done same box
-		// if(fabs( Q[0*(Nq/P)+i] - C[0*(Nc/P)+mini] ) > fabs( Q[0*(Nq/P)+i] - ( nbl + ( (nbh-nbl)/n ) * xx ) ) || mini==-1 ){
-		// 	temp=0;
-		// 	if(xx+1<=n){
-		// 		target=10000*(xx+1)+100*yy+zz;
-		// 		if(rank==v){
-		// 			// printf("mphka xh box: %d and value : %d\n",target,indexOfBoxC[target]);
-		// 		}
-		// 		for(j=indexOfBoxC[target];j<ic;j++){
-		// 			if(target==C[3*(Nc/P)+j]){
-		// 				temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
-		// 				if(min>temp){
-		// 					min=temp;
-		// 					min_n[0]=C[0*(Nc/P)+j];
-		// 					min_n[1]=C[1*(Nc/P)+j];
-		// 					min_n[2]=C[2*(Nc/P)+j];
-		// 					if(rank==v){
-		// 						// printf("DISTANCE *XH* box from %f %f %f: %f\n",min_n[0],min_n[1],min_n[2],min);
-		// 					}
-		// 				}
-		// 			}else{
-		// 				break;
-		// 			}
-		// 		}
-		// 	}else{
-
-		// 	}
-		// }
-		// // Check for xx-1 yy zz 	done same box
-		// if(fabs( Q[0*(Nq/P)+i] - C[0*(Nc/P)+mini] ) > fabs( Q[0*(Nq/P)+i] - ( nbl + ( (nbh-nbl)/n ) * ( xx - 1 ) ) ) || mini==-1 ){
-		// 	temp=0;
-		// 	if(xx-1>=1){
-		// 		target=10000*(xx-1)+100*yy+zz;
-		// 		if(rank==v){
-		// 			// printf("mphka xl box: %d and value : %d\n",target,indexOfBoxC[target]);
-		// 		}
-		// 		for(j=indexOfBoxC[target];j<ic;j++){
-		// 			if(target==C[3*(Nc/P)+j]){
-		// 				temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
-		// 				if(min>temp){
-		// 					min=temp;
-		// 					min_n[0]=C[0*(Nc/P)+j];
-		// 					min_n[1]=C[1*(Nc/P)+j];
-		// 					min_n[2]=C[2*(Nc/P)+j];
-		// 					if(rank==v){
-		// 						// printf("DISTANCE *XL* box from %f %f %f: %f\n",min_n[0],min_n[1],min_n[2],min);
-		// 					}
-		// 				}
-		// 			}else{
-		// 				break;
-		// 			}
-		// 		}
-		// 	}else{
-				
-		// 	}
-		// }
-		// // Check for xx yy+1 zz 	done same box
-		// if(fabs( Q[1*(Nq/P)+i] - C[1*(Nc/P)+mini] ) > fabs( Q[0*(Nq/P)+i] - ( mbl + ( (mbh-mbl)/m ) *  yy ) ) || mini==-1 ){
-		// 	temp=0;
-		// 	if(yy+1<=m){
-		// 		target=10000*xx+100*(yy+1)+zz;
-		// 		if(rank==v){
-		// 			// printf("mphka yh box: %d and value : %d\n",target,indexOfBoxC[target]);
-		// 		}
-		// 		for(j=indexOfBoxC[target];j<ic;j++){
-		// 			if(target==C[3*(Nc/P)+j]){
-		// 				temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
-		// 				if(min>temp){
-		// 					min=temp;
-		// 					min_n[0]=C[0*(Nc/P)+j];
-		// 					min_n[1]=C[1*(Nc/P)+j];
-		// 					min_n[2]=C[2*(Nc/P)+j];
-		// 					if(rank==v){
-		// 						// printf("DISTANCE *YH* box from %f %f %f: %f\n",min_n[0],min_n[1],min_n[2],min);
-		// 					}
-		// 				}
-		// 			}else{
-		// 				break;
-		// 			}
-		// 		}
-		// 	}else{
-				
-		// 	}
-		// }
-		// // Check for xx yy-1 zz 	done same box
-		// if(fabs( Q[1*(Nq/P)+i] - C[1*(Nc/P)+mini] ) > fabs( Q[0*(Nq/P)+i] - ( mbl + ( (mbh-mbl)/m ) *  ( yy - 1 ) ) ) || mini==-1 ){
-		// 	temp=0;
-		// 	if(yy-1>=1){
-		// 		target=10000*xx+100*(yy-1)+zz;
-		// 		if(rank==v){
-		// 			// printf("mphka yl box: %d and value : %d\n",target,indexOfBoxC[target]);
-		// 		}
-		// 		for(j=indexOfBoxC[target];j<ic;j++){
-		// 			if(target==C[3*(Nc/P)+j]){
-		// 				temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
-		// 				if(min>temp){
-		// 					min=temp;
-		// 					min_n[0]=C[0*(Nc/P)+j];
-		// 					min_n[1]=C[1*(Nc/P)+j];
-		// 					min_n[2]=C[2*(Nc/P)+j];
-		// 					if(rank==v){
-		// 						// printf("DISTANCE *YL* box from %f %f %f: %f\n",min_n[0],min_n[1],min_n[2],min);
-		// 					}
-		// 				}
-		// 			}else{
-		// 				break;
-		// 			}
-		// 		}
-		// 	}else{
-				
-		// 	}
-		// }
-		// // Check for xx yy zz+1 	done same box
-		// if(fabs( Q[2*(Nq/P)+i] - C[2*(Nc/P)+mini] ) > fabs( Q[0*(Nq/P)+i] - ( kbl + ( (kbh-kbl)/k ) *  zz ) ) || mini==-1 ){
-		// 	temp=0;
-		// 	if(zz+1<=k){
-		// 		target=10000*xx+100*yy+zz+1;
-		// 		if(rank==v){
-		// 			// printf("mphka zh box: %d and value : %d\n",target,indexOfBoxC[target]);
-		// 		}
-		// 		for(j=indexOfBoxC[target];j<ic;j++){
-		// 			if(target==C[3*(Nc/P)+j]){
-		// 				temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
-		// 				if(min>temp){
-		// 					min=temp;
-		// 					min_n[0]=C[0*(Nc/P)+j];
-		// 					min_n[1]=C[1*(Nc/P)+j];
-		// 					min_n[2]=C[2*(Nc/P)+j];
-		// 					if(rank==v){
-		// 						// printf("DISTANCE *ZH* box from %f %f %f: %f\n",min_n[0],min_n[1],min_n[2],min);
-		// 					}
-		// 				}
-		// 			}else{
-		// 				break;
-		// 			}
-		// 		}
-		// 	}else{
-				
-		// 	}
-		// }
-		// // Check for xx yy zz-1
-		// if(fabs( Q[2*(Nq/P)+i] - C[2*(Nc/P)+mini] ) > fabs( Q[0*(Nq/P)+i] - ( kbl + ( (kbh-kbl)/k ) *  ( zz - 1 ) ) ) || mini==-1 ){
-		// 	temp=0;
-		// 	if(zz-1>=1){
-		// 		target=10000*xx+100*yy+zz-1;
-		// 		if(rank==v){
-		// 			// printf("mphka zl box: %d and value : %d\n",target,indexOfBoxC[target]);
-		// 		}
-		// 		for(j=indexOfBoxC[target];j<ic;j++){
-		// 			if(target==C[3*(Nc/P)+j]){
-		// 				temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
-		// 				if(min>temp){
-		// 					min=temp;
-		// 					min_n[0]=C[0*(Nc/P)+j];
-		// 					min_n[1]=C[1*(Nc/P)+j];
-		// 					min_n[2]=C[2*(Nc/P)+j];
-		// 					if(rank==v){
-		// 						// printf("DISTANCE *ZL* box from %f %f %f: %f\n",min_n[0],min_n[1],min_n[2],min);
-		// 					}
-		// 				}
-		// 			}else{
-		// 				break;
-		// 			}
-		// 		}
-		// 	}else{
-				
-		// 	}
-		// }
-		// double test_min=1;
-		// double test_min_table[3];
-		// Check if its ok!
-		// for(j=0;j<ic;j++){
-		// 	temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
-		// 	if(test_min>temp){
-		// 		test_min_table[0]=C[0*(Nc/P)+j];
-		// 		test_min_table[1]=C[1*(Nc/P)+j];
-		// 		test_min_table[2]=C[2*(Nc/P)+j];
-		// 		test_min=temp;
-		// 	}
-		// }
-		// if(rank==v){
-		// 	printf("my mins:\n %f %f %f: %f\n",min_n[0],min_n[1],min_n[2],min);
-		// 	printf("slow mins:\n %f %f %f: %f\n",test_min_table[0],test_min_table[1],test_min_table[2],test_min);
-		// }
-		// if(min_n[0] != test_min_table[0] || min_n[1] != test_min_table[1] || min_n[2] != test_min_table[2] ){
-		// 	if(rank==v){
-		// 		printf("fack\n");
-		// 		exit(1);
-		// 	}
-		// }
+		
 		min_n[0]=0;
 		min_n[1]=0;
 		min_n[2]=0;
 		mini=-1;
 		min=1;
 	}
-	// temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
-	// printf("box=%d dist= %f\n",(int)C[3*(Nc/P)+j],temp);
-	// printf("index is %d \n",indexOfBoxC[(int)Q[3*(Nq/P)+i]]);
-	// To the end
-	// min_n[0]=0;
-	// min_n[1]=0;
-	// min_n[2]=0;
-	// min=1;
-	// if(rank==v){
-		// printf("C Table\n");
-		// print_table(C,ic,4,Nc/P);
-		// printf("Q Table\n");
-		// print_table(Q,iq,4,Nq/P);
-		// printf("\n");
-
-	// }
 }
 
 
