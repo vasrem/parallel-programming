@@ -23,6 +23,8 @@ int L;	// Used for table allocation and make_grid()
 double *C,*Co,*Ci; // C , Coutput , Cinput
 double *Q,*Qo,*Qi; // Q , Qoutput , Qinput
 
+int *indexOfBoxC; // Starting index of specific Box in C
+
 
 /* ic is the real size of C ( Not zero )
 * jc is the real size of Co ( Not zero )
@@ -50,6 +52,7 @@ void check_inc_Q();
 void print_table(double *,int,int,int);
 void quicksort(double *,int,int,int);
 void search_nn();
+void search_serial();
 
 
 int main(int argc, char **argv){
@@ -153,6 +156,9 @@ int main(int argc, char **argv){
 	
 	if(rank==0){
 		// printf("Number of active processes is %d\n",numtasks);
+		// printf("%d %d %d %d\n",Nc,Nq,gs,P);
+		// printf("n=%f m=%f k=%f\n",n,m,k);
+		// printf("no=%f mo=%f ko=%f\n",no,mo,ko);
 		printf("--------Info--------\n");
 		printf("# of processes: %d\t-> %d\n",atoi(argv[4]),P);
 		printf("size of C     : %d\t-> %d\n",atoi(argv[1]),Nc);
@@ -198,7 +204,7 @@ int main(int argc, char **argv){
 			check_inc_C();
 			check_inc_Q();
 			MPI_Barrier(mc);
-
+			MPI_Barrier(mc);
 			free(Ci);
 			free(Qi);
 			free(Co);
@@ -215,7 +221,12 @@ int main(int argc, char **argv){
 		// Search
 
 		gettimeofday (&startwtime, NULL);
-		search_nn();
+		if(numtasks==2){
+			search_serial();
+		}else{
+			search_nn();
+		}
+		
 		MPI_Barrier(mc);
 		gettimeofday (&endwtime, NULL);
 		if(rank==1){
@@ -230,13 +241,7 @@ int main(int argc, char **argv){
 				printf("Error opening file!\n");
 				exit(1);
 			}
-			fprintf(f,"--------Info--------\n");
-			fprintf(f,"# of processes: %d\t-> %d\n",atoi(argv[4]),P);
-			fprintf(f,"size of C     : %d\t-> %d\n",atoi(argv[1]),Nc);
-			fprintf(f,"size of Q     : %d\t-> %d\n",atoi(argv[2]),Nq);
-			fprintf(f,"size of grid  : %d\t-> %d\n",atoi(argv[3]),gs);
-			fprintf(f,"Grid creation time : %f\n",grid_time);
-			fprintf(f,"Search nearest neighbor time : %f\n",search_time);
+			fprintf(f,"%d\t-\t%d\t-\t%d\t->\t%f\t%f\n",atoi(argv[1]),atoi(argv[3]),P,grid_time,search_time);
 			fclose(f);
 		}
 	}
@@ -244,17 +249,55 @@ int main(int argc, char **argv){
 	MPI_Finalize();
 
 }
+
+void search_serial(){
+	double min=1;
+	int mini=-1;
+	double min_n[3];
+	double temp;
+	int i,j;
+	for(i=0;i<iq;i++){
+		for(j=0;j<ic;j++){
+			temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+			if(min>temp){
+				min=temp;
+				min_n[0]=C[0*(Nc/P)+j];
+				min_n[1]=C[1*(Nc/P)+j];
+				min_n[2]=C[2*(Nc/P)+j];
+				mini=j;
+			}
+		}
+	}
+}
+
 void search_nn(){
 
 	int i,j,s,z,c;
+	int e1,e2,e3;
 	double temp;
 	int target;
+	int target2;
+	int xx;	//x box
+	int yy;	//y box
+	int zz;	//z box
+	int v=2; // TEST RANK
 	double *Cxl,*Cyl,*Czl;
 	double *Cxh,*Cyh,*Czh;
+	
+
+	int *indexOfBoxCxl,*indexOfBoxCyl,*indexOfBoxCzl;
+	int *indexOfBoxCxh,*indexOfBoxCyh,*indexOfBoxCzh;
+
+	int done[6];
+	for(i=0;i<6;i++){
+		done[i]=0;
+	}
+
 	MPI_Request *reqs;
-	reqs = (MPI_Request *) malloc(12*sizeof(MPI_Request));
+	reqs = (MPI_Request *) malloc(24*sizeof(MPI_Request));
 	MPI_Status *stats;
-	stats = (MPI_Status *) malloc(6*sizeof(MPI_Status));
+	stats = (MPI_Status *) malloc(12*sizeof(MPI_Status));
+
 	// Initialize the incoming tables
 	Cxl =(double *) malloc((Nc/P)*4*sizeof(double));
 	Cyl =(double *) malloc((Nc/P)*4*sizeof(double));
@@ -263,104 +306,113 @@ void search_nn(){
 	Cyh =(double *) malloc((Nc/P)*4*sizeof(double));
 	Czh =(double *) malloc((Nc/P)*4*sizeof(double));
 
-	// MPI Send Recieves
+	indexOfBoxCxl=(int *) malloc(999999*sizeof(int));
+	indexOfBoxCyl=(int *) malloc(999999*sizeof(int));
+	indexOfBoxCzl=(int *) malloc(999999*sizeof(int));
+	indexOfBoxCxh=(int *) malloc(999999*sizeof(int));
+	indexOfBoxCyh=(int *) malloc(999999*sizeof(int));
+	indexOfBoxCzh=(int *) malloc(999999*sizeof(int));
+
 
 	// xh send
 	target = rank + ( (ko/k) * (mo/m) );
 	if(target<numtasks){
 		// printf("Sending xh to rank #%d\n",target);
 		MPI_Isend(&C[0],Nc/P,MPI_DOUBLE,target,1+(10*rank),MPI_COMM_WORLD,&reqs[0]);
+		MPI_Isend(&indexOfBoxC[0],999999,MPI_INT,target,1+(1000*rank),MPI_COMM_WORLD,&reqs[1]);
 	}
 
 	// xl send
 	target = rank - ( (ko/k) * (mo/m) );
 	if(target>0){
 		// printf("Sending xl to rank #%d\n",target);
-		MPI_Isend(&C[0],Nc/P,MPI_DOUBLE,target,2+(10*rank),MPI_COMM_WORLD,&reqs[1]);
+		MPI_Isend(&C[0],Nc/P,MPI_DOUBLE,target,2+(10*rank),MPI_COMM_WORLD,&reqs[2]);
+		MPI_Isend(&indexOfBoxC[0],999999,MPI_INT,target,2+(1000*rank),MPI_COMM_WORLD,&reqs[3]);
 	}
 
 	// yh send
 	target = rank + (ko/k);
 	if(target<numtasks){
 		// printf("Sending yh to rank #%d\n",target);
-		MPI_Isend(&C[0],Nc/P,MPI_DOUBLE,target,3+(10*rank),MPI_COMM_WORLD,&reqs[2]);
+		MPI_Isend(&C[0],Nc/P,MPI_DOUBLE,target,3+(10*rank),MPI_COMM_WORLD,&reqs[4]);
+		MPI_Isend(&indexOfBoxC[0],999999,MPI_INT,target,3+(1000*rank),MPI_COMM_WORLD,&reqs[5]);
 	}
 
 	// yl send
 	target = rank - (ko/k);
 	if(target>0){
 		// printf("Sending yl to rank #%d\n",target);
-		MPI_Isend(&C[0],Nc/P,MPI_DOUBLE,target,4+(10*rank),MPI_COMM_WORLD,&reqs[3]);
+		MPI_Isend(&C[0],Nc/P,MPI_DOUBLE,target,4+(10*rank),MPI_COMM_WORLD,&reqs[6]);
+		MPI_Isend(&indexOfBoxC[0],999999,MPI_INT,target,4+(1000*rank),MPI_COMM_WORLD,&reqs[7]);
 	}
 
 	// zh send
 	target = rank + 1;
 	if(target<numtasks){
 		// printf("Sending zh to rank #%d\n",target);
-		MPI_Isend(&C[0],Nc/P,MPI_DOUBLE,target,5+(10*rank),MPI_COMM_WORLD,&reqs[4]);
+		MPI_Isend(&C[0],Nc/P,MPI_DOUBLE,target,5+(10*rank),MPI_COMM_WORLD,&reqs[8]);
+		MPI_Isend(&indexOfBoxC[0],999999,MPI_INT,target,5+(1000*rank),MPI_COMM_WORLD,&reqs[9]);
 	}
 
 	// zl send
 	target = rank - 1;
 	if(target>0){
 		// printf("Sending zl to rank #%d\n",target);
-		MPI_Isend(&C[0],Nc/P,MPI_DOUBLE,target,6+(10*rank),MPI_COMM_WORLD,&reqs[5]);
+		MPI_Isend(&C[0],Nc/P,MPI_DOUBLE,target,6+(10*rank),MPI_COMM_WORLD,&reqs[10]);
+		MPI_Isend(&indexOfBoxC[0],999999,MPI_INT,target,6+(1000*rank),MPI_COMM_WORLD,&reqs[11]);
 	}
-
 
 	// if there is xh
 	target = rank + ( (ko/k) * (mo/m) );
 	if(target<numtasks){
-		MPI_Irecv(&Cxh[0],Nc/P,MPI_DOUBLE,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[6]);
+		MPI_Irecv(&Cxh[0],Nc/P,MPI_DOUBLE,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[12]);
+		MPI_Irecv(&indexOfBoxCxh[0],999999,MPI_INT,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[13]);
 	}
 
 	// if there is xl
 	target = rank - ( (ko/k) * (mo/m) );
 	if(target>0){
-		MPI_Irecv(&Cxl[0],Nc/P,MPI_DOUBLE,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[7]);
+		MPI_Irecv(&Cxl[0],Nc/P,MPI_DOUBLE,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[14]);
+		MPI_Irecv(&indexOfBoxCzl[0],999999,MPI_INT,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[15]);
 	}
 
 	// if there is yh
 	target = rank + (ko/k);
 	if(target<numtasks){
-		MPI_Irecv(&Cyh[0],Nc/P,MPI_DOUBLE,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[8]);
+		MPI_Irecv(&Cyh[0],Nc/P,MPI_DOUBLE,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[16]);
+		MPI_Irecv(&indexOfBoxCyh[0],999999,MPI_INT,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[17]);
 	}
 
 	// if there is yl
 	target = rank - (ko/k);
 	if(target>0){
-		MPI_Irecv(&Cyl[0],Nc/P,MPI_DOUBLE,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[9]);
+		MPI_Irecv(&Cyl[0],Nc/P,MPI_DOUBLE,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[18]);
+		MPI_Irecv(&indexOfBoxCyl[0],999999,MPI_INT,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[19]);
 	}
 
 	// if there is zh
 	target = rank + 1;
 	if(target<numtasks){
-		MPI_Irecv(&Czh[0],Nc/P,MPI_DOUBLE,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[10]);
+		MPI_Irecv(&Czh[0],Nc/P,MPI_DOUBLE,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[20]);
+		MPI_Irecv(&indexOfBoxCzh[0],999999,MPI_INT,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[21]);
 	}
 
 	// if there is zl
 	target = rank - 1;
 	if(target>0){
-		MPI_Irecv(&Czl[0],Nc/P,MPI_DOUBLE,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[11]);
+		MPI_Irecv(&Czl[0],Nc/P,MPI_DOUBLE,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[22]);
+		MPI_Irecv(&indexOfBoxCzl[0],999999,MPI_INT,target,MPI_ANY_TAG,MPI_COMM_WORLD,&reqs[23]);
 	}
 
 	// min value and index.
 	double min=1;
-	int mini=0;
+	int mini=-1;
 	double min_n[3];
-	c=0;
-	z=-1;
+	
 	for(i=0;i<iq;i++){
-		// avoid to check to some boxes.
-		if(i>0){
-			if(Q[3*(Nq/P)+i]==Q[3*(Nq/P)+i-1]){
-				c-=z;
-			}
-			z=-1;
-		}
-		for(j=c;j<ic;j++){
-			z++;
-			// Check if its in the same box.
+		temp=0;
+		// Checking my box
+		for(j=indexOfBoxC[(int)Q[3*(Nq/P)+i]];j<ic;j++){
 			if(Q[3*(Nq/P)+i]==C[3*(Nc/P)+j]){
 				temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
 				if(min>temp){
@@ -370,238 +422,235 @@ void search_nn(){
 					min_n[2]=C[2*(Nc/P)+j];
 					mini=j;
 				}
-			}
-			else{
-				c=j;
+			}else{
 				break;
 			}
 		}
-		if(j==ic){
-			z--;
-		}
-		if( (fabs( Q[0*(Nq/P)+i] - C[0*(Nc/P)+mini] ) > fabs( Q[0*(Nq/P)+i] - nbh )) && nbh<1 ){
-			// Check if the box is in the same process
-			temp=0;
-			if((int)(Q[3*(Nq/P)+i]+10000)/10000<=(n)){
-				for(j=0;j<ic;j++){
-					if((Q[3*(Nq/P)+i]+10000)==C[3*(Nc/P)+j]){
-						temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
-						if(min>temp){
-							min=temp;
-							min_n[0]=C[0*(Nc/P)+j];
-							min_n[1]=C[1*(Nc/P)+j];
-							min_n[2]=C[2*(Nc/P)+j];
-						}
-					}else{
-						if(temp!=0){
-							break;
-						}
-					}
-				}
-			}else{
-				// Check the recieved boxes
-				target = rank + ( (ko/k) * (mo/m) );
-				if(target<numtasks){
-					MPI_Wait(&reqs[6],&stats[0]);
-					// Check first ic/(n*m*k)+20 data of Cxh
-					for(j=0;j<(ic/(n*m*k)+20);j++){
-							temp=sqrt(pow(Cxh[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cxh[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cxh[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
-							if(min>temp){
-								min=temp;
-								min_n[0]=Cxh[0*(Nc/P)+j];
-								min_n[1]=Cxh[1*(Nc/P)+j];
-								min_n[2]=Cxh[2*(Nc/P)+j];
-							}
-					}
-				}
-			}
-		}
-		if( ( fabs( Q[0*(Nq/P)+i] - C[0*(Nc/P)+mini] ) > fabs( Q[0*(Nq/P)+i] - nbl ) ) && nbl>0 ){
-			temp=0;
-			if((int)(Q[3*(Nq/P)+i]-10000)/10000>=1){
-				for(j=0;j<ic;j++){
-					if((Q[3*(Nq/P)+i]-10000)==C[3*(Nc/P)+j]){
-						temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
-						if(min>temp){
-							min=temp;
-							min_n[0]=C[0*(Nc/P)+j];
-							min_n[1]=C[1*(Nc/P)+j];
-							min_n[2]=C[2*(Nc/P)+j];
-						}
-					}else{
-						if(temp!=0){
-							break;
-						}
-					}
-				}
-			}else{
-				target = rank - ( (ko/k) * (mo/m) );
-				if(target>0){
-					// Check last ic/(n*m*k)+20 data of Cxl
-					MPI_Wait(&reqs[7],&stats[1]);
-					for(j=ic-1;j>=ic-(ic/(n*m*k))-20;j--){
-							temp=sqrt(pow(Cxl[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cxl[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cxl[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
-							if(min>temp){
-								min=temp;
-								min_n[0]=Cxl[0*(Nc/P)+j];
-								min_n[1]=Cxl[1*(Nc/P)+j];
-								min_n[2]=Cxl[2*(Nc/P)+j];
-							}
-					}
-				}
-			}
-		}
-		if( ( fabs( Q[1*(Nq/P)+i] - C[1*(Nc/P)+mini] ) > fabs( Q[1*(Nq/P)+i] - mbh )) && mbh<1 ){
-			temp=0;
-			if(((((int)Q[3*(Nq/P)+i])%10000)+100)/100<=(m)){
-				for(j=0;j<ic;j++){
-					if((Q[3*(Nq/P)+i]+100)==C[3*(Nc/P)+j]){
-						temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
-						if(min>temp){
-							min=temp;
-							min_n[0]=C[0*(Nc/P)+j];
-							min_n[1]=C[1*(Nc/P)+j];
-							min_n[2]=C[2*(Nc/P)+j];
-						}
-					}else{
-						if(temp!=0){
-							break;
-						}
-					}
-				}
-			}else{
-				target = rank + (ko/k);
-				if(target<numtasks){
-					// Check first ic/(n*m*k)+20 data of Cyh
-					MPI_Wait(&reqs[8],&stats[2]);
-					for(j=0;j<(ic/(n*m*k))+20;j++){
-							temp=sqrt(pow(Cyh[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cyh[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cyh[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
-							if(min>temp){
-								min=temp;
-								min_n[0]=Cyh[0*(Nc/P)+j];
-								min_n[1]=Cyh[1*(Nc/P)+j];
-								min_n[2]=Cyh[2*(Nc/P)+j];
-							}
-					}
-				}
-			}
-		}
-		if( (fabs( Q[1*(Nq/P)+i] - C[1*(Nc/P)+mini] ) > fabs( Q[1*(Nq/P)+i] - mbl ) ) && mbl>0 ){
-			temp=0;
-			if(((((int)Q[3*(Nq/P)+i])%10000)-100)/100>=1){
-				for(j=0;j<ic;j++){
-					if((Q[3*(Nq/P)+i]-100)==C[3*(Nc/P)+j]){
-						temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
-						if(min>temp){
-							min=temp;
-							min_n[0]=C[0*(Nc/P)+j];
-							min_n[1]=C[1*(Nc/P)+j];
-							min_n[2]=C[2*(Nc/P)+j];
-						}
-					}else{
-						if(temp!=0){
-							break;
-						}
-					}
-				}
-			}else{
-				target = rank - (ko/k);
-				if(target>0){
-					// Check last ic/(n*m*k)+20 data of Cyl
-					MPI_Wait(&reqs[9],&stats[3]);
-					for(j=ic-1;j>=ic-(ic/(n*m*k))-20;j--){
-							temp=sqrt(pow(Cyl[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cyl[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cyl[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
-							if(min>temp){
-								min=temp;
-								min_n[0]=Cyl[0*(Nc/P)+j];
-								min_n[1]=Cyl[1*(Nc/P)+j];
-								min_n[2]=Cyl[2*(Nc/P)+j];
-							}
-					}
-				}
-			}
-		}
-		if( (fabs( Q[2*(Nq/P)+i] - C[2*(Nc/P)+mini] ) > fabs( Q[2*(Nq/P)+i] - kbh )) && kbh<1 ){
-			temp=0;
-			if(((((int)Q[3*(Nq/P)+i])%100)+1)<=(k)){
-				for(j=0;j<ic;j++){
-					if((Q[3*(Nq/P)+i]+1)==C[3*(Nc/P)+j]){
-						temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
-						if(min>temp){
-							min=temp;
-							min_n[0]=C[0*(Nc/P)+j];
-							min_n[1]=C[1*(Nc/P)+j];
-							min_n[2]=C[2*(Nc/P)+j];
-						}
-					}else{
-						if(temp!=0){
-							break;
-						}
-					}
-				}
-			}else{
-				target = rank + 1;
-				if(target<numtasks){
-					// Check first ic/(n*m*k)+20 data of Czh
-					MPI_Wait(&reqs[10],&stats[4]);
-					for(j=0;j<(ic/(n*m*k))+20;j++){
-							temp=sqrt(pow(Czh[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Czh[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Czh[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
-							if(min>temp){
-								min=temp;
-								min_n[0]=Czh[0*(Nc/P)+j];
-								min_n[1]=Czh[1*(Nc/P)+j];
-								min_n[2]=Czh[2*(Nc/P)+j];
-							}
-					}
-				}
-			}
-		}
-		if( (fabs( Q[2*(Nq/P)+i] - C[2*(Nc/P)+mini] ) > fabs( Q[2*(Nq/P)+i] - kbl ) ) && kbl>0 ){
-			temp=0;
-			if(((((int)Q[3*(Nq/P)+i])%100)-1)>=1){
-				for(j=0;j<ic;j++){
-					if((Q[3*(Nq/P)+i]-1)==C[3*(Nc/P)+j]){
-						temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
-						if(min>temp){
-							min=temp;
-							min_n[0]=C[0*(Nc/P)+j];
-							min_n[1]=C[1*(Nc/P)+j];
-							min_n[2]=C[2*(Nc/P)+j];
-						}
-					}else{
-						if(temp!=0){
-							break;
-						}
-					}
-				}
-			}else{
-				target = rank - 1;
-				if(target>0){
-					// Check last ic/(n*m*k)+20 data of Czl
-					MPI_Wait(&reqs[11],&stats[5]);
-					for(j=ic-1;j>=ic-(ic/(n*m*k))-20;j--){
-							temp=sqrt(pow(Czl[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Czl[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Czl[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
-							if(min>temp){
-								min=temp;
-								min_n[0]=Czl[0*(Nc/P)+j];
-								min_n[1]=Czl[1*(Nc/P)+j];
-								min_n[2]=Czl[2*(Nc/P)+j];
-							}
-					}
-				}
-			}
-		}
-		min=1;
-		mini=0;
-	}
 
+		xx=(int)Q[3*(Nq/P)+i]/10000;
+		yy=(int)Q[3*(Nq/P)+i]%10000/100;
+		zz=(int)Q[3*(Nq/P)+i]%100;	
+		// Checking other boxes
+		for(e1=xx-1;e1<=xx+1;e1++){
+			for(e2=yy-1;e2<=yy+1;e2++){
+				for(e3=zz-1;e3<=zz+1;e3++){
+
+					if(e1==xx && e2==yy && e3==zz){
+						continue;
+					}
+
+					if(e1<=n && e1>=1){
+
+						if(e2<=m && e2>=1){
+
+							if(e3<=k && e3>=1){
+
+								target=10000*e1+100*e2+e3;
+								if(e1==xx){
+									if(e2==yy){
+										if(e3==zz-1){
+											done[0]=1;	// We will not search xx yy zz-1 to other process
+										}else if(e3==zz+1){
+											done[1]=1;	// We will not search xx yy zz+1 to other process
+										}
+									}else if(e2==yy-1){
+										if(e3==zz){
+											done[2]=1;	//We will not search xx yy-1 zz to other process
+										}
+									}else if(e2==yy+1){
+										if(e3==zz){
+											done[3]=1;	//We will not search xx yy+1 zz to other process
+										}
+									}
+								}else if(e1==xx-1){
+									if(e2==yy){
+										if(e3==zz){
+											done[4]=1;	//We will not search xx-1 yy zz to other process
+										}
+									}
+								}else if(e1==xx+1){
+									if(e2==yy){
+										if(e3==zz){
+											done[5]=1;	//We will not search xx+1 yy zz to other process
+										}
+									}
+								}
+								for(j=indexOfBoxC[target];j<ic;j++){
+									if(target==C[3*(Nc/P)+j]){
+										temp=sqrt(pow(C[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(C[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(C[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+										if(min>temp){
+											min=temp;
+											min_n[0]=C[0*(Nc/P)+j];
+											min_n[1]=C[1*(Nc/P)+j];
+											min_n[2]=C[2*(Nc/P)+j];
+										}
+									}else{
+										break;
+									}
+								}
+							} 
+
+						}
+
+					}
+
+				}
+			}
+		}
+
+		// Zl Check
+		if(done[0]){
+			target = rank - 1;
+			if(target>0 && kbl>0){
+				MPI_Wait(&reqs[22],&stats[0]);
+				MPI_Wait(&reqs[23],&stats[1]);
+				target=10000*xx+100*yy+k;
+				for(j=indexOfBoxCzl[target];j<ic;j++){
+					if(target==Czl[3*(Nc/P)+j]){
+						temp=sqrt(pow(Czl[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Czl[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Czl[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+						if(min>temp){
+							min=temp;
+							min_n[0]=Czl[0*(Nc/P)+j];
+							min_n[1]=Czl[1*(Nc/P)+j];
+							min_n[2]=Czl[2*(Nc/P)+j];
+						}
+					}else{
+						break;
+					}	
+				}
+
+			}
+		}
+		// Zh Check
+		if(done[1]){
+			target = rank + 1;
+			if(target<numtasks && kbh<1){
+				MPI_Wait(&reqs[20],&stats[2]);
+				MPI_Wait(&reqs[21],&stats[3]);
+				target=10000*xx+100*yy+1;
+				for(j=indexOfBoxCzh[target];j<ic;j++){
+					if(target==Czh[3*(Nc/P)+j]){
+						temp=sqrt(pow(Czh[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Czh[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Czh[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+						if(min>temp){
+							min=temp;
+							min_n[0]=Czh[0*(Nc/P)+j];
+							min_n[1]=Czh[1*(Nc/P)+j];
+							min_n[2]=Czh[2*(Nc/P)+j];
+						}
+					}else{
+						break;
+					}
+				}
+
+			}
+
+		}
+		// Yl Check
+		if(done[2]){
+			target = rank - (ko/k);
+			if(target>0 && mbl>0){
+				MPI_Wait(&reqs[18],&stats[4]);
+				MPI_Wait(&reqs[19],&stats[5]);
+				target=10000*xx+100*m+zz;
+				for(j=indexOfBoxCyl[target];j<ic;j++){
+					if(target==Cyl[3*(Nc/P)+j]){
+						temp=sqrt(pow(Cyl[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cyl[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cyl[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+						if(min>temp){
+							min=temp;
+							min_n[0]=Cyl[0*(Nc/P)+j];
+							min_n[1]=Cyl[1*(Nc/P)+j];
+							min_n[2]=Cyl[2*(Nc/P)+j];
+						}
+					}else{
+						break;
+					}
+				}
+
+			}
+		}
+		// Yh Check
+		if(done[3]){
+			target = rank + (ko/k);
+			if(target<numtasks && mbh<1){
+				MPI_Wait(&reqs[16],&stats[6]);
+				MPI_Wait(&reqs[17],&stats[7]);
+				target=10000*xx+100*1+zz;
+				for(j=indexOfBoxCyh[target];j<ic;j++){
+					if(target==Cyh[3*(Nc/P)+j]){
+						temp=sqrt(pow(Cyh[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cyh[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cyh[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+						if(min>temp){
+							min=temp;
+							min_n[0]=Cyh[0*(Nc/P)+j];
+							min_n[1]=Cyh[1*(Nc/P)+j];
+							min_n[2]=Cyh[2*(Nc/P)+j];
+						}
+					}else{
+						break;
+					}
+				}
+
+			}
+		}
+		// Xl Check
+		if(done[4]){
+			target = rank - ( (ko/k) * (mo/m) );
+			if(target>0  && nbl>0){
+				MPI_Wait(&reqs[14],&stats[8]);
+				MPI_Wait(&reqs[15],&stats[9]);
+				target=10000*n+100*yy+zz;
+				for(j=indexOfBoxCxl[target];j<ic;j++){
+					if(target==C[3*(Nc/P)+j]){
+						temp=sqrt(pow(Cxl[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cxl[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cxl[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+						if(min>temp){
+							min=temp;
+							min_n[0]=Cxl[0*(Nc/P)+j];
+							min_n[1]=Cxl[1*(Nc/P)+j];
+							min_n[2]=Cxl[2*(Nc/P)+j];
+						}
+					}else{
+						break;
+					}
+				}
+
+			}
+		}
+		// Xh Check
+		if(done[5]){
+			target = rank + ( (ko/k) * (mo/m) );
+			if(target<numtasks && nbh<1){
+				MPI_Wait(&reqs[12],&stats[10]);
+				MPI_Wait(&reqs[13],&stats[11]);
+				target=10000*1+100*1+zz;
+				for(j=indexOfBoxCxh[target];j<ic;j++){
+					if(target==Cxh[3*(Nc/P)+j]){
+						temp=sqrt(pow(Cxh[0*(Nc/P)+j]-Q[0*(Nq/P)+i],2)+pow(Cxh[1*(Nc/P)+j]-Q[1*(Nq/P)+i],2)+pow(Cxh[2*(Nc/P)+j]-Q[2*(Nq/P)+i],2));
+						if(min>temp){
+							min=temp;
+							min_n[0]=Cxh[0*(Nc/P)+j];
+							min_n[1]=Cxh[1*(Nc/P)+j];
+							min_n[2]=Cxh[2*(Nc/P)+j];
+						}
+					}else{
+						break;
+					}
+				}
+
+			}
+		}
+		
+		min_n[0]=0;
+		min_n[1]=0;
+		min_n[2]=0;
+		mini=-1;
+		min=1;
+	}
 }
 
 
 void check_inc_C(){
 	int s,z=0;
 	int A=0;
-	double a,vima;
+	double a;
 	L = (Nc / P);
 	// sleep(2*rank);
 	double *d;
@@ -632,7 +681,6 @@ void check_inc_C(){
 			C[2*L+ic]=0;
 			C[3*L+ic]=0;
 	// Find x coordinate
-			vima = nbh-nbl;
 			for(a = nbl ; a < nbh ; a = a + (nbh-nbl)/n){
 				if(Ci[z*L+s]<a){
 					break;
@@ -696,8 +744,17 @@ void check_inc_C(){
 		ic++;
 		A=0;
 	}
-
 	quicksort(C,0,ic-1,L);
+	// Fill indexOfBoxC table
+	for(s=0;s<ic;s++){
+		if(s>0){
+			if(C[3*L+s]!=C[3*L+s-1]){
+				indexOfBoxC[(int)C[3*L+s]]=s;
+			}
+		}else{
+			indexOfBoxC[(int)C[3*L+s]]=0;
+		}
+	}
 	
 }
 
@@ -802,8 +859,6 @@ void check_inc_Q(){
 	}
 	quicksort(Q,0,iq-1,L);
 	
-
-
 }
 
 void make_grid(){
@@ -822,16 +877,16 @@ void make_grid(){
 	*/
 	int A=0;
 
-// Temp table of rand numbers
+	// Temp table of rand numbers
 	double *d;
 	d =(double *) malloc(3*sizeof(double));
 
-// srand setup 
+	// srand setup 
 	struct timeval time; 
 	gettimeofday(&time,NULL);
 	srand((time.tv_sec * 1000)*(rank+1) + (time.tv_usec / 1000)*(rank+1));
 
-// Malloc tables
+	// Malloc tables
 	
 	L=Nc/P;
 	C =(double *) malloc(L*4*sizeof(double));
@@ -839,6 +894,8 @@ void make_grid(){
 	L=Nq/P;
 	Q =(double *) malloc(L*4*sizeof(double));
 	Qo =(double *) malloc(L*3*sizeof(double));
+
+	indexOfBoxC=(int *) malloc(999999*sizeof(int));
 	// zero to everything
 	for(s=0; s < L*4;s++){
 		C[s]=0;
@@ -893,7 +950,7 @@ void make_grid(){
 		}
 	}
 
-// Generate Q
+	// Generate Q
 
 	L=Nq/P;
 	for( s = 0 ; s < L ; s++ ){
@@ -945,8 +1002,8 @@ void make_grid(){
 	}
 
 
-	quicksort(C,0,ic-1,Nc/P);
-	quicksort(Q,0,iq-1,Nq/P);
+	// quicksort(C,0,ic-1,Nc/P);
+	// quicksort(Q,0,iq-1,Nq/P);
 	
 }
 
