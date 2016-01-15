@@ -23,6 +23,9 @@ int L;	// Used for table allocation and make_grid()
 double *C,*Co,*Ci; // C , Coutput , Cinput
 double *Q,*Qo,*Qi; // Q , Qoutput , Qinput
 
+int *indexOfBoxC; // Starting index of specific Box in C
+int *indexOfBoxQ; // Starting index of specific Box in Q
+
 
 /* ic is the real size of C ( Not zero )
 * jc is the real size of Co ( Not zero )
@@ -201,7 +204,7 @@ int main(int argc, char **argv){
 			check_inc_C();
 			check_inc_Q();
 			MPI_Barrier(mc);
-
+			MPI_Barrier(mc);
 			free(Ci);
 			free(Qi);
 			free(Co);
@@ -1101,8 +1104,16 @@ void check_inc_C(){
 		ic++;
 		A=0;
 	}
-
 	quicksort(C,0,ic-1,L);
+	for(s=0;s<ic;s++){
+		if(s>0){
+			if(C[3*L+s]!=C[3*L+s-1]){
+				indexOfBoxC[(int)C[3*L+s]]=s;
+			}
+		}else{
+			indexOfBoxC[(int)C[3*L+s]]=0;
+		}
+	}
 	
 }
 
@@ -1206,9 +1217,17 @@ void check_inc_Q(){
 		A=0;
 	}
 	quicksort(Q,0,iq-1,L);
+
+	for(s=0;s<iq;s++){
+		if(s>0){
+			if(Q[3*L+s]!=Q[3*L+s-1]){
+				indexOfBoxQ[(int)Q[3*L+s]]=s;
+			}
+		}else{
+			indexOfBoxQ[(int)Q[3*L+s]]=0;
+		}
+	}
 	
-
-
 }
 
 void make_grid(){
@@ -1227,16 +1246,16 @@ void make_grid(){
 	*/
 	int A=0;
 
-// Temp table of rand numbers
+	// Temp table of rand numbers
 	double *d;
 	d =(double *) malloc(3*sizeof(double));
 
-// srand setup 
+	// srand setup 
 	struct timeval time; 
 	gettimeofday(&time,NULL);
 	srand((time.tv_sec * 1000)*(rank+1) + (time.tv_usec / 1000)*(rank+1));
 
-// Malloc tables
+	// Malloc tables
 	
 	L=Nc/P;
 	C =(double *) malloc(L*4*sizeof(double));
@@ -1244,6 +1263,9 @@ void make_grid(){
 	L=Nq/P;
 	Q =(double *) malloc(L*4*sizeof(double));
 	Qo =(double *) malloc(L*3*sizeof(double));
+
+	indexOfBoxC=(int *) malloc(999999*sizeof(int));
+	indexOfBoxQ=(int *) malloc(999999*sizeof(int));
 	// zero to everything
 	for(s=0; s < L*4;s++){
 		C[s]=0;
@@ -1298,7 +1320,7 @@ void make_grid(){
 		}
 	}
 
-// Generate Q
+	// Generate Q
 
 	L=Nq/P;
 	for( s = 0 ; s < L ; s++ ){
@@ -1350,8 +1372,8 @@ void make_grid(){
 	}
 
 
-	quicksort(C,0,ic-1,Nc/P);
-	quicksort(Q,0,iq-1,Nq/P);
+	// quicksort(C,0,ic-1,Nc/P);
+	// quicksort(Q,0,iq-1,Nq/P);
 	
 }
 
