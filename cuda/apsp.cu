@@ -13,11 +13,13 @@ float *h_a;			// Table at host
 float *d_a;			// Table at device
 int tsize=0;		// number of rows or columns
 size_t size = 0 ;	// size of table( tsize* tsize * sizeof(float*))
+float* test;
 
-
-void print();
+void print(float *);
 void make_table();
 void serial();
+void check();
+void copytables();
 
 __global__ void Kernel1(float *A,int N,int k){
 
@@ -32,7 +34,6 @@ __global__ void Kernel1(float *A,int N,int k){
 int main(){
 
 	make_table();
-	/*print();*/
 
 	gettimeofday(&startwtime,NULL);
 
@@ -40,6 +41,9 @@ int main(){
 	
 	gettimeofday(&endwtime,NULL);
 	printf("Serial time : %lf\n",	(double)((endwtime.tv_usec - startwtime.tv_usec)/1.0e6 + endwtime.tv_sec - startwtime.tv_sec));
+
+	copytables();
+	free(h_a);
 
 	// ----------------------------
 	//           Kernel 1
@@ -70,14 +74,20 @@ int main(){
 
 	cudaMemcpy(h_a, d_a, size, cudaMemcpyDeviceToHost);
 
+	gettimeofday(&endwtime,NULL);
+	printf("Kernel 1 time : %lf\n",	(double)((endwtime.tv_usec - startwtime.tv_usec)/1.0e6 + endwtime.tv_sec - startwtime.tv_sec));
 	// Free device and host memory
 	
+
+	check();
 	cudaFree(d_a);
 	free(h_a);
 
-	gettimeofday(&endwtime,NULL);
-	printf("Kernel 1 time : %lf\n",	(double)((endwtime.tv_usec - startwtime.tv_usec)/1.0e6 + endwtime.tv_sec - startwtime.tv_sec));
 
+	// ----------------------------
+	//           Kernel 2
+	// ----------------------------
+	
 	return 0;
 	
 }
@@ -99,7 +109,7 @@ void serial(){
 			}
 		}
 	}
-	printf("\nDone Serial.\n");
+	/*printf("\nDone Serial.\n");*/
 }
 
 
@@ -123,7 +133,6 @@ void make_table(){
 	size = tsize*tsize*sizeof(float);	
 	// Alloc the table at host
 	h_a =(float *) malloc (size);
-	
 	// Fill the table
 	while(fgets(buf,sizeof(buf),fp)!=NULL){
 		for(j = 0 ; j < tsize ; j++ ){
@@ -133,7 +142,7 @@ void make_table(){
 	}
 
 	fclose(fp);
-	printf("\nDone making table.\n");
+	/*printf("\nDone making table.\n");*/
 }
 
 
@@ -142,15 +151,15 @@ void make_table(){
  *	-------
  *	Prints the table A	
  */
-void print(){
+void print(float *a){
 	int i = 0;
 	int j = 0;
 	for(i=0;i<tsize;i++){
 		for(j=0;j<tsize;j++){
 			if(isinf(h_a[i*tsize+j])){
-				printf("%f\t\t",h_a[i*tsize+j]);
+				printf("%f\t\t",a[i*tsize+j]);
 			}else{
-				printf("%f\t",h_a[i*tsize+j]);
+				printf("%f\t",a[i*tsize+j]);
 			}
 		}
 		printf("\n-------------------------\n");
@@ -159,4 +168,22 @@ void print(){
 }
 
 
+void check(){
+	int i = 0;
+	int j = 0;
+	for(i=0;i<tsize;i++){
+		for(j=0;j<tsize;j++){
+			if(h_a[i*tsize+j]!=test[i*tsize+j]){
+				printf("Error at [%d][%d] -> %f %f.\n",i,j,h_a[i*tsize+j],test[i*tsize+j]);
+			}
+		}
+	}
+}
 
+void copytables(){
+	int i = 0;
+	test=(float *) malloc (size);	
+	for(i=0;i<tsize*tsize;i++){
+		test[i]=h_a[i];
+	}
+}
