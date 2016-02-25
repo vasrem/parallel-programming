@@ -7,8 +7,9 @@
 #define bufSize 1024
 #define INF 999999
 
-float **A;		// input Table
-float tsize=0;
+float *a;
+int tsize=0;
+
 
 
 void print();
@@ -18,7 +19,7 @@ void run();
 int main(){
 
 	make_table();
-	print();
+	/*print();*/
 	run();
 	return 0;
 	
@@ -33,13 +34,13 @@ void run(){
 	for ( i = 0 ; i < tsize ; i++ ){
 		for( j = 0 ; j < tsize ; j++ ){
 			for( k = 0 ; k < tsize ; k++ ){
-				if( A[i][j] > A[i][k] + A[k][j] ){
-					A[i][j] = A[i][k] + A[k][j];
+				if( a[i*tsize+j] > a[i*tsize+k] + a[k*tsize+j] ){
+					a[i*tsize+j] = a[i*tsize+k] + a[k*tsize+j];
 				}				
 			}
 		}
 	}
-	printf("\nDone!");
+	printf("\nDone Serial.\n");
 }
  
 /*	make_table()
@@ -48,7 +49,6 @@ void run(){
  *	input file has at first line size of table 
  *	and at the other lines the content.
  */
-
 void make_table(){
 	FILE * fp;
 	char buf[bufSize];
@@ -59,24 +59,21 @@ void make_table(){
 	
 	// Read size of table
 	fgets(buf,sizeof(buf),fp);
-	tsize = atof(buf);
+	tsize =(int) atof(buf);
 	
 	// Alloc the table
-	A =malloc (tsize*sizeof(float *));
-	for(i=0;i<tsize;i++){
-		A[i]=malloc(tsize*sizeof(float));
-	}
-	i=0;
+	a =malloc (tsize*tsize*sizeof(float *));
 	
 	// Fill the table
 	while(fgets(buf,sizeof(buf),fp)!=NULL){
 		for(j = 0 ; j < tsize ; j++ ){
-			A[i][j]=atof(&buf[16*j]);
+			a[i*tsize+j]=atof(&buf[16*j]);
 		}
 		i++;
 	}
 
 	fclose(fp);
+	printf("\nDone making table.\n");
 }
 /*	print()
  *	-------
@@ -87,13 +84,16 @@ void print(){
 	int j = 0;
 	for(i=0;i<tsize;i++){
 		for(j=0;j<tsize;j++){
-			if(isinf(A[i][j])){
-				printf("%f\t\t",A[i][j]);
+			if(isinf(a[i*tsize+j])){
+				printf("%f\t\t",a[i*tsize+j]);
 			}else{
-				printf("%f\t",A[i][j]);
+				printf("%f\t",a[i*tsize+j]);
 			}
 		}
 		printf("\n-------------------------\n");
 	}
 
 }
+
+
+
