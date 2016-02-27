@@ -25,20 +25,56 @@ __global__ void Kernel1(float *A,int N,int k){
 
 	int i = blockDim.x * blockIdx.x + threadIdx.x;
 	int j = blockDim.y * blockIdx.y + threadIdx.y;
-
+	//printf("Hello from %d %d \n",threadIdx.x,threadIdx.y);
 	if ( A[i*N+j] > A[i*N+k] + A[k*N+j] ){
 		A[i*N+j] = A[i*N+k] + A[k*N+j];
 	}
 }
 
+__global__ void Kernel2(float *A,int N,int k){
+	
+	int i = blockDim.x * blockIdx.x + threadIdx.x;
+	int j = blockDim.y * blockIdx.y + threadIdx.y;
+
+	__shared__ float k_k1,k1_k;
+
+	if(threadIdx.x==0 && threadIdx.y==0){
+		k_k1=A[k*N+(k+1)];
+		k1_k=A[(k+1)*N+k];
+	}
+	float x,y,asked,xn,yn;
+
+	x=A[k*N+j];
+	y=A[i*N+k];
+	asked=A[i*N+j];
+	
+	if(asked>x+y){
+		asked=x+y;
+	}
+	xn=A[i*N+(k+1)];
+	yn=A[(k+1)*N+j];
+	__syncthreads();
+	
+	if(xn>y+k_k1){
+		xn=y+k_k1;
+	}
+	if(yn>x+k1_k){
+		yn=x+k1_k;
+	}
+	if(asked>xn+yn){
+		asked=xn+yn;
+	}
+
+	A[i*N+j]=asked;
+}
+
 int main(){
 
 	make_table();
-
 	gettimeofday(&startwtime,NULL);
 
 	serial();
-	
+
 	gettimeofday(&endwtime,NULL);
 	printf("Serial time : %lf\n",	(double)((endwtime.tv_usec - startwtime.tv_usec)/1.0e6 + endwtime.tv_sec - startwtime.tv_sec));
 
@@ -53,13 +89,13 @@ int main(){
 	gettimeofday(&startwtime,NULL);
 
 	// Alloc device table
-	cudaMalloc(&d_a,size);
+	cudaMalloc((void **)&d_a,size);
 
 	// Transfer table to device
 	cudaMemcpy(d_a, h_a, size, cudaMemcpyHostToDevice);	
 
 	// Define dimensions	
-	int threads = tsize;	
+	int threads = 32;
 	dim3 dimBlock(threads,threads);
 	dim3 dimGrid(tsize/dimBlock.x,tsize/dimBlock.y);	
 
@@ -67,7 +103,7 @@ int main(){
 	int k = 0;
 	for ( k = 0 ; k < tsize ; k++){
 		Kernel1<<<dimGrid,dimBlock>>>(d_a,tsize,k);
-		cudaThreadSynchronize();
+		cudaDeviceSynchronize();	
 	}
 	
 	// Transfer table to host
@@ -76,10 +112,11 @@ int main(){
 
 	gettimeofday(&endwtime,NULL);
 	printf("Kernel 1 time : %lf\n",	(double)((endwtime.tv_usec - startwtime.tv_usec)/1.0e6 + endwtime.tv_sec - startwtime.tv_sec));
-	// Free device and host memory
 	
-
+	// Checks the result
 	check();
+	
+	// Free device and host memory
 	cudaFree(d_a);
 	free(h_a);
 
@@ -88,6 +125,36 @@ int main(){
 	//           Kernel 2
 	// ----------------------------
 	
+	make_table();
+	gettimeofday(&startwtime,NULL);
+
+	// Alloc device table
+	cudaMalloc((void **)&d_a,size);
+
+	// Transfer table to device
+	cudaMemcpy(d_a, h_a, size, cudaMemcpyHostToDevice);	
+
+	// Do the math
+	for ( k = 0 ; k < tsize ; k+=2){
+		Kernel2<<<dimGrid,dimBlock>>>(d_a,tsize,k);
+		cudaDeviceSynchronize();	
+	}
+	
+	// Transfer table to host
+
+	cudaMemcpy(h_a, d_a, size, cudaMemcpyDeviceToHost);
+
+	gettimeofday(&endwtime,NULL);
+	printf("Kernel 2 time : %lf\n",	(double)((endwtime.tv_usec - startwtime.tv_usec)/1.0e6 + endwtime.tv_sec - startwtime.tv_sec));
+
+
+	// Checks the result
+	check();
+	
+	// Free device and host memory
+	cudaFree(d_a);
+	free(h_a);
+
 	return 0;
 	
 }
@@ -100,9 +167,10 @@ int main(){
 void serial(){
 	int i , j , k ;
 
-	for ( i = 0 ; i < tsize ; i++ ){
-		for( j = 0 ; j < tsize ; j++ ){
-			for( k = 0 ; k < tsize ; k++ ){
+	for ( k = 0 ; k < tsize ; k++ ){
+		for( i = 0 ; i < tsize ; i++ ){
+			for( j = 0 ; j < tsize ; j++ ){
+
 				if( h_a[i*tsize+j] > h_a[i*tsize+k] + h_a[k*tsize+j] ){
 					h_a[i*tsize+j] = h_a[i*tsize+k] + h_a[k*tsize+j];
 				}				
@@ -136,7 +204,11 @@ void make_table(){
 	// Fill the table
 	while(fgets(buf,sizeof(buf),fp)!=NULL){
 		for(j = 0 ; j < tsize ; j++ ){
-			h_a[i*tsize+j]=atof(&buf[16*j]);
+			if(isinf(atof(&buf[16*j]))){
+				h_a[i*tsize+j]=999999;
+			}else{
+				h_a[i*tsize+j]=atof(&buf[16*j]);
+			}
 		}
 		i++;
 	}
@@ -167,19 +239,32 @@ void print(float *a){
 
 }
 
-
+/*	check()
+ *	-------
+ *	Checks if the produced table of Kernel is the same
+ *	as the serial's table.
+ */
 void check(){
 	int i = 0;
 	int j = 0;
 	for(i=0;i<tsize;i++){
 		for(j=0;j<tsize;j++){
-			if(h_a[i*tsize+j]!=test[i*tsize+j]){
-				printf("Error at [%d][%d] -> %f %f.\n",i,j,h_a[i*tsize+j],test[i*tsize+j]);
+			if(fabs(h_a[i*tsize+j]-test[i*tsize+j])>1e-6){
+				/*printf("Error at [%d][%d] -> %f %f.\n",i,j,h_a[i*tsize+j],test[i*tsize+j]);*/
+				printf("Fail!\n");
+				exit(1);
 			}
 		}
 	}
+	printf("Success!\n");
 }
 
+
+/*	copytables()
+ *	------------
+ *	Copys the serial's table to test table.
+ *	Test table is used at check().
+ */
 void copytables(){
 	int i = 0;
 	test=(float *) malloc (size);	
