@@ -38,7 +38,7 @@ __global__ void Kernel2(float *A,int N,int k){
 
 	__shared__ float k_k1,k1_k;
 	/*	example:
-	 *	if we have to from D -> F throw k and then k+1 we have to do:
+	 *	if we have to go from D -> F throw k and then k+1 we have to do:
 	 *	DkF check
 	 *  D(k+1)F check
 	 *	Dk(k+1)F check
@@ -80,6 +80,19 @@ __global__ void Kernel2(float *A,int N,int k){
 	}
 	//	min dist
 	A[i*N+j]=asked;
+}
+
+void __global__ Kernel3(float *A,int N,int k){
+	int row,col,col_k;
+	row = blockIdx.x*N;
+	col_k= k*N;
+	for(col=0;col<N;col++){
+		if(A[row+col]>A[row+k]+A[col_k+col]){
+			A[row+col]=A[row+k]+A[col_k+col];
+		}
+
+
+	}
 }
 
 int main(){
@@ -169,6 +182,39 @@ int main(){
 	cudaFree(d_a);
 	free(h_a);
 
+	// ----------------------------
+	//           Kernel 3 
+	// ----------------------------
+	
+	make_table();
+	gettimeofday(&startwtime,NULL);
+
+	// Alloc device table
+	cudaMalloc((void **)&d_a,size);
+
+	// Transfer table to device
+	cudaMemcpy(d_a, h_a, size, cudaMemcpyHostToDevice);	
+
+	// Do the math
+	for ( k = 0 ; k < tsize ; k++){
+		Kernel3<<<tsize,tsize>>>(d_a,tsize,k);
+		cudaDeviceSynchronize();	
+	}
+	
+	// Transfer table to host
+
+	cudaMemcpy(h_a, d_a, size, cudaMemcpyDeviceToHost);
+
+	gettimeofday(&endwtime,NULL);
+	printf("Kernel 3 time : %lf\n",	(double)((endwtime.tv_usec - startwtime.tv_usec)/1.0e6 + endwtime.tv_sec - startwtime.tv_sec));
+
+
+	// Checks the result
+	check();
+	
+	// Free device and host memory
+	cudaFree(d_a);
+	free(h_a);
 	return 0;
 	
 }
