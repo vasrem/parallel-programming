@@ -83,15 +83,35 @@ __global__ void Kernel2(float *A,int N,int k){
 }
 
 void __global__ Kernel3(float *A,int N,int k){
-	int row,col,col_k;
+	int row,col,col_k,col_k_1;
+	__shared__ float rowk,rowk_1,k_k1,k1_k;
 	row = blockIdx.x*N;
 	col_k= k*N;
+	col_k_1=(k+1)*N;
+	if(threadIdx.x==0 && threadIdx.y==0){
+		rowk=A[row+k];
+		rowk_1=A[row+(k+1)];
+		k_k1=A[k*N+(k+1)];
+		k1_k=A[(k+1)*N+k];
+	}
+	__syncthreads();
 	for(col=0;col<N;col++){
-		if(A[row+col]>A[row+k]+A[col_k+col]){
-			A[row+col]=A[row+k]+A[col_k+col];
+		// DkF
+		if(A[row+col]>rowk+A[col_k+col]){
+			A[row+col]=rowk+A[col_k+col];
 		}
-
-
+		// D(k+1)F
+		if(A[row+col]>rowk_1+A[col_k_1+col]){
+			A[row+col]=rowk_1+A[col_k_1+col];
+		}
+		// Dk(k+1)F
+		if(A[row+col]>rowk+k_k1+A[col_k_1+col]){
+			A[row+col]=rowk+k_k1+A[col_k_1+col];
+		}
+		// D(k+1)kF
+		if(A[row+col]>rowk_1+k1_k+A[col_k+col]){
+			A[row+col]=rowk_1+k1_k+A[col_k+col];
+		}
 	}
 }
 
@@ -196,8 +216,8 @@ int main(){
 	cudaMemcpy(d_a, h_a, size, cudaMemcpyHostToDevice);	
 
 	// Do the math
-	for ( k = 0 ; k < tsize ; k++){
-		Kernel3<<<tsize,tsize>>>(d_a,tsize,k);
+	for ( k = 0 ; k < tsize ; k+=2){
+		Kernel3<<<tsize,16>>>(d_a,tsize,k);
 		cudaDeviceSynchronize();	
 	}
 	
