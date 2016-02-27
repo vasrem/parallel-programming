@@ -95,7 +95,7 @@ void __global__ Kernel3(float *A,int N,int k){
 		k1_k=A[(k+1)*N+k];
 	}
 	__syncthreads();
-	for(col=0;col<N;col++){
+	for(col=threadIdx.x*N/16;col<(threadIdx.x+1)*N/16;col++){
 		// DkF
 		if(A[row+col]>rowk+A[col_k+col]){
 			A[row+col]=rowk+A[col_k+col];
